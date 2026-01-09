@@ -1,0 +1,252 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap'); */
+
+@layer base {
+  /* Light Mode (default) */
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 224 20% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 224 20% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 20% 15%;
+
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 224 20% 15%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 262 83% 58%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 262 83% 58%;
+
+    --radius: 0.75rem;
+
+    /* Node type colors - slightly muted for light mode */
+    --node-start: 142 71% 40%;
+    --node-question: 217 91% 55%;
+    --node-answer: 262 83% 53%;
+    --node-condition: 38 92% 45%;
+    --node-api: 174 84% 40%;
+    --node-end: 0 72% 46%;
+    --node-ai: 280 85% 55%;
+    --node-fallback: 25 95% 50%;
+    --node-delay: 200 70% 50%;
+    --node-handoff: 330 80% 55%;
+    --node-active: 142 71% 50%;
+
+    /* Shadows - softer for light mode */
+    --shadow-glow: 0 0 20px -5px;
+    --shadow-card: 0 4px 20px -2px hsla(0, 0%, 0%, 0.08);
+
+    /* Glass effect - light mode */
+    --glass-bg: hsla(0, 0%, 100%, 0.85);
+    --glass-border: hsla(220, 13%, 80%, 0.6);
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 224 20% 15%;
+    --sidebar-primary: 262 83% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 224 20% 15%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 262 83% 58%;
+  }
+
+  /* Dark Mode */
+  .dark {
+    --background: 225 25% 8%;
+    --foreground: 210 40% 98%;
+
+    --card: 225 25% 12%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 225 25% 10%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 262 83% 58%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 225 25% 18%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 225 20% 20%;
+    --muted-foreground: 215 20% 55%;
+
+    --accent: 262 83% 58%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 225 20% 22%;
+    --input: 225 20% 18%;
+    --ring: 262 83% 58%;
+
+    /* Node type colors - vibrant neon for dark mode */
+    --node-start: 142 71% 45%;
+    --node-question: 217 91% 60%;
+    --node-answer: 262 83% 58%;
+    --node-condition: 38 92% 50%;
+    --node-api: 174 84% 45%;
+    --node-end: 0 72% 51%;
+    --node-ai: 280 85% 60%;
+    --node-fallback: 25 95% 55%;
+    --node-delay: 200 70% 55%;
+    --node-handoff: 330 80% 60%;
+    --node-active: 142 71% 55%;
+
+    /* Shadows - glowing for dark mode */
+    --shadow-glow: 0 0 20px -5px;
+    --shadow-card: 0 4px 20px -2px hsla(0, 0%, 0%, 0.3);
+
+    /* Glass effect - dark mode */
+    --glass-bg: hsla(225, 25%, 12%, 0.8);
+    --glass-border: hsla(225, 20%, 30%, 0.5);
+
+    --sidebar-background: 225 25% 10%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 262 83% 58%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 225 25% 18%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 225 20% 22%;
+    --sidebar-ring: 262 83% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+  }
+
+  .node-glow-start {
+    box-shadow: var(--shadow-glow) hsl(var(--node-start) / 0.5);
+  }
+
+  .node-glow-question {
+    box-shadow: var(--shadow-glow) hsl(var(--node-question) / 0.5);
+  }
+
+  .node-glow-answer {
+    box-shadow: var(--shadow-glow) hsl(var(--node-answer) / 0.5);
+  }
+
+  .node-glow-condition {
+    box-shadow: var(--shadow-glow) hsl(var(--node-condition) / 0.5);
+  }
+
+  .node-glow-api {
+    box-shadow: var(--shadow-glow) hsl(var(--node-api) / 0.5);
+  }
+
+  .node-glow-end {
+    box-shadow: var(--shadow-glow) hsl(var(--node-end) / 0.5);
+  }
+
+  .node-glow-ai {
+    box-shadow: var(--shadow-glow) hsl(var(--node-ai) / 0.5);
+  }
+
+  .node-glow-fallback {
+    box-shadow: var(--shadow-glow) hsl(var(--node-fallback) / 0.5);
+  }
+
+  .node-glow-delay {
+    box-shadow: var(--shadow-glow) hsl(var(--node-delay) / 0.5);
+  }
+
+  .node-glow-handoff {
+    box-shadow: var(--shadow-glow) hsl(var(--node-handoff) / 0.5);
+  }
+
+  .node-active-glow {
+    box-shadow: 0 0 30px 5px hsl(var(--node-active) / 0.7);
+    animation: pulse-glow 1s ease-in-out infinite;
+  }
+}
+
+/* React Flow custom styles */
+.react-flow__background {
+  background-color: hsl(var(--background)) !important;
+}
+
+.react-flow__minimap {
+  background-color: hsl(var(--card)) !important;
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+}
+
+.react-flow__controls {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.react-flow__controls-button {
+  background: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: var(--radius) !important;
+  color: hsl(var(--foreground)) !important;
+  margin: 2px !important;
+}
+
+.react-flow__controls-button:hover {
+  background: hsl(var(--secondary)) !important;
+}
+
+.react-flow__edge-path {
+  stroke: hsl(var(--muted-foreground)) !important;
+  stroke-width: 2 !important;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: hsl(var(--primary)) !important;
+  stroke-width: 3 !important;
+}
+
+.react-flow__handle {
+  width: 12px !important;
+  height: 12px !important;
+  border: 2px solid hsl(var(--border)) !important;
+  background: hsl(var(--card)) !important;
+  transition: all 0.2s ease;
+}
+
+.react-flow__handle:hover {
+  background: hsl(var(--primary)) !important;
+  border-color: hsl(var(--primary)) !important;
+  transform: scale(1.2);
+}
