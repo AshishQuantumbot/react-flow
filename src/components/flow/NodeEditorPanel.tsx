@@ -58,6 +58,18 @@ export function NodeEditorPanel() {
 
   const handleDelete = () => {
     if (selectedNodeId && selectedNode.type !== "start") {
+      // Check if deleting this question node would also delete end nodes
+      if (selectedNode.type === "question") {
+        const remainingQuestionNodes = nodes.filter(
+          (n) => n.type === "question" && n.id !== selectedNodeId
+        );
+        const endNodes = nodes.filter((n) => n.type === "end");
+        
+        if (remainingQuestionNodes.length === 0 && endNodes.length > 0) {
+          // Show confirmation or just proceed - the store will handle the cascading delete
+        }
+      }
+      
       deleteNode(selectedNodeId);
     }
   };

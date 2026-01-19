@@ -80,10 +80,7 @@ export function NodeToolbar() {
       </p>
       <div className="space-y-1">
         {nodeTypes.map(({ type, icon, label, color }) => {
-          const disabled =
-            (type === "start" && hasStartNode) ||
-            (type === "question" && hasQuestionNode);
-
+          const disabled = type === "start" && hasStartNode;
           const finalDisabled = hasEndNode === true ? true : disabled;
 
           return (

@@ -189,13 +189,23 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   addNode: (type, position) => {
-    const { nodes } = get();
+    const { nodes, edges, selectedNodeId } = get();
 
     if (type === "start" && nodes.some((n) => n.type === "start")) {
       return;
     }
 
-    const labels: Record<NodeType, string> = {
+    // Prevent adding end/CTA nodes if there are no question nodes
+    if (type === "end") {
+      const hasQuestionNodes = nodes.some((n) => n.type === "question");
+      if (!hasQuestionNodes) {
+        // You could show a toast/alert here if needed
+        console.warn("Cannot add End/CTA node without at least one Question node");
+        return;
+      }
+    }
+
+    const baseLabels: Record<NodeType, string> = {
       start: "Start",
       question: "Question",
       answer: "Answer",
@@ -208,14 +218,121 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       handoff: "Human Handoff",
     };
 
+    // Generate unique label with numbering for duplicate types
+    const getUniqueLabel = (baseLabel: string, nodeType: NodeType): string => {
+      if (nodeType === "start") return baseLabel; // Start node is always unique
+      
+      const existingNodes = nodes.filter(n => n.type === nodeType);
+      if (existingNodes.length === 0) {
+        return baseLabel; // First node of this type
+      }
+      
+      // Find the highest number used
+      let maxNumber = 0;
+      existingNodes.forEach(node => {
+        const match = node.data.label.match(new RegExp(`^${baseLabel}\\s*(\\d+)?$`));
+        if (match) {
+          const num = match[1] ? parseInt(match[1]) : 1;
+          maxNumber = Math.max(maxNumber, num);
+        }
+      });
+      
+      // For the first duplicate, use "Question 2", "Answer 2", etc.
+      const nextNumber = maxNumber === 0 ? 2 : maxNumber + 1;
+      return `${baseLabel} ${nextNumber}`;
+    };
+
+    const baseLabel = baseLabels[type];
+    const uniqueLabel = getUniqueLabel(baseLabel, type);
+
+    // Set default data based on node type
+    let defaultData: FlowNodeData = { label: uniqueLabel };
+    
+    if (type === "question") {
+      defaultData = {
+        ...defaultData,
+        required: "yes", // Default to YES
+      };
+    } else if (type === "end") {
+      defaultData = {
+        ...defaultData,
+        meetingType: "meeting-schedule", // Default meeting type
+      };
+    }
+
     const newNode: Node<FlowNodeData> = {
       id: generateId(),
       type,
       position,
-      data: { label: labels[type] },
+      data: defaultData,
     };
 
-    set({ nodes: [...nodes, newNode] });
+    // Auto-connect logic
+    let sourceNodeId: string | null = null;
+
+    // If there's a selected node, try to connect from it
+    if (selectedNodeId) {
+      const selectedNode = nodes.find(n => n.id === selectedNodeId);
+      if (selectedNode && selectedNode.type !== "end") {
+        // Check if selected node already has an outgoing connection
+        const hasOutgoingConnection = edges.some(e => e.source === selectedNodeId);
+        if (!hasOutgoingConnection) {
+          sourceNodeId = selectedNodeId;
+        }
+      }
+    }
+
+    // If no selected node or selected node can't connect, find the best candidate
+    if (!sourceNodeId) {
+      // Find the best node to connect from based on flow logic
+      const availableNodes = nodes.filter(n => 
+        n.type !== "end" && !edges.some(e => e.source === n.id)
+      );
+
+      if (availableNodes.length > 0) {
+        // Priority order for connecting:
+        // 1. Start node (if no connections)
+        // 2. Most recently added question/answer/condition node
+        // 3. Any other available node
+        
+        const startNode = availableNodes.find(n => n.type === "start");
+        const questionNodes = availableNodes.filter(n => n.type === "question");
+        const answerNodes = availableNodes.filter(n => n.type === "answer");
+        const conditionNodes = availableNodes.filter(n => n.type === "condition");
+        
+        if (startNode) {
+          sourceNodeId = startNode.id;
+        } else if (questionNodes.length > 0) {
+          // Connect from the most recently added question node
+          sourceNodeId = questionNodes[questionNodes.length - 1].id;
+        } else if (answerNodes.length > 0) {
+          sourceNodeId = answerNodes[answerNodes.length - 1].id;
+        } else if (conditionNodes.length > 0) {
+          sourceNodeId = conditionNodes[conditionNodes.length - 1].id;
+        } else {
+          sourceNodeId = availableNodes[availableNodes.length - 1].id;
+        }
+      }
+    }
+
+    // Create the new edge if we found a source
+    const newEdges = sourceNodeId ? [
+      ...edges,
+      {
+        id: `edge-${sourceNodeId}-${newNode.id}`,
+        source: sourceNodeId,
+        target: newNode.id,
+        animated: true,
+        style: { strokeWidth: 2 },
+      }
+    ] : edges;
+
+    set({ 
+      nodes: [...nodes, newNode],
+      edges: newEdges,
+      selectedNodeId: newNode.id,
+      isPanelOpen: true
+    });
   },
 
   updateNodeData: (nodeId, data) => {
@@ -230,9 +347,71 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   deleteNode: (nodeId) => {
     const { nodes, edges } = get();
+    const nodeToDelete = nodes.find((n) => n.id === nodeId);
+    
+    if (!nodeToDelete) return;
+
+    let nodesToDelete = [nodeId];
+    let edgesToDelete = edges.filter((e) => e.source === nodeId || e.target === nodeId);
+
+    // Smart reconnection logic
+    const incomingEdge = edges.find((e) => e.target === nodeId);
+    const outgoingEdges = edges.filter((e) => e.source === nodeId);
+    
+    let newEdges = edges.filter((e) => !edgesToDelete.some((del) => del.id === e.id));
+
+    // If the deleted node was in the middle of a chain, reconnect the chain
+    if (incomingEdge && outgoingEdges.length > 0) {
+      // For each outgoing connection, create a new connection from the incoming source
+      outgoingEdges.forEach((outEdge) => {
+        const newEdge = {
+          id: `edge-${incomingEdge.source}-${outEdge.target}`,
+          source: incomingEdge.source,
+          target: outEdge.target,
+          animated: true,
+          style: { strokeWidth: 2 },
+          // Preserve sourceHandle and targetHandle if they exist
+          ...(outEdge.sourceHandle && { sourceHandle: incomingEdge.sourceHandle }),
+          ...(outEdge.targetHandle && { targetHandle: outEdge.targetHandle }),
+        };
+        
+        // Only add if this connection doesn't already exist
+        const connectionExists = newEdges.some(
+          (e) => e.source === newEdge.source && e.target === newEdge.target
+        );
+        
+        if (!connectionExists) {
+          newEdges.push(newEdge);
+        }
+      });
+    }
+
+    // If deleting a question node, check if we need to delete end/CTA nodes
+    if (nodeToDelete.type === "question") {
+      // Count remaining question nodes after this deletion
+      const remainingQuestionNodes = nodes.filter(
+        (n) => n.type === "question" && n.id !== nodeId
+      );
+
+      // If no question nodes will remain, delete all end/CTA nodes
+      if (remainingQuestionNodes.length === 0) {
+        const endNodesToDelete = nodes
+          .filter((n) => n.type === "end")
+          .map((n) => n.id);
+        
+        nodesToDelete = [...nodesToDelete, ...endNodesToDelete];
+        
+        // Also remove edges connected to end nodes
+        const additionalEdgesToDelete = newEdges.filter((e) => 
+          endNodesToDelete.includes(e.source) || endNodesToDelete.includes(e.target)
+        );
+        newEdges = newEdges.filter((e) => !additionalEdgesToDelete.some((del) => del.id === e.id));
+      }
+    }
+
     set({
-      nodes: nodes.filter((n) => n.id !== nodeId),
-      edges: edges.filter((e) => e.source !== nodeId && e.target !== nodeId),
+      nodes: nodes.filter((n) => !nodesToDelete.includes(n.id)),
+      edges: newEdges,
       selectedNodeId: null,
       isPanelOpen: false,
     });
@@ -282,7 +461,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     // Check for end node
     const endNodes = nodes.filter((n) => n.type === "end");
     if (endNodes.length === 0) {
-      errors.push("Flow must have at least one End node");
+      errors.push("Flow must have at least one CTA node");
     }
 
     // Check for unconnected nodes
