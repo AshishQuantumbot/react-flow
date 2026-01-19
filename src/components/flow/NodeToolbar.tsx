@@ -50,13 +50,9 @@ const nodeTypes: {
 export function NodeToolbar() {
   const { addNode, nodes } = useFlowStore();
   const { screenToFlowPosition } = useReactFlow();
-
-  console.log("nodes", nodes);
-
   const hasStartNode = nodes.some((n) => n.type === "start");
   const hasQuestionNode = nodes.some((n) => n.type === "question");
   const hasEndNode = nodes.some((n) => n.type === "end");
-  console.log("hasEndNode", hasEndNode);
 
   const handleDragStart = (event: React.DragEvent, nodeType: NodeType) => {
     event.dataTransfer.setData("application/reactflow", nodeType);

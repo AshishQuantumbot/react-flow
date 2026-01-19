@@ -24,6 +24,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 
 export function FlowHeader() {
@@ -43,6 +44,7 @@ export function FlowHeader() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isSubmitOpen, setIsSubmitOpen] = useState(false);
   const [exportedJson, setExportedJson] = useState("");
+  const [payloadData, setPayloadData] = useState("");
   const [isDark, setIsDark] = useState(true);
 
   useEffect(() => {
@@ -145,17 +147,28 @@ export function FlowHeader() {
 
     const json = exportFlow();
     const formattedJson = JSON.stringify(JSON.parse(json), null, 2);
+    const payloadObject = JSON.parse(json);
+    const formattedPayload = JSON.stringify(payloadObject, null, 2);
+    
     setExportedJson(formattedJson);
+    setPayloadData(formattedPayload);
     setIsSubmitOpen(true);
-    console.log("Flow JSON:", json);
+    
+    // Console log the payload
+    console.log("Flow Payload:", payloadObject);
+    
+    toast({
+      title: "Flow Submitted",
+      description: "Flow payload has been logged to console.",
+    });
   };
 
-  const handleCopyJson = async () => {
+  const handleCopyJson = async (content = exportedJson) => {
     try {
-      await navigator.clipboard.writeText(exportedJson);
+      await navigator.clipboard.writeText(content);
       toast({
         title: "Copied!",
-        description: "JSON copied to clipboard.",
+        description: "Content copied to clipboard.",
       });
     } catch (err) {
       toast({
@@ -295,30 +308,58 @@ export function FlowHeader() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Send className="w-5 h-5" />
-                Flow JSON Output
+                Flow Submission
               </DialogTitle>
               <DialogDescription>
-                Your chatbot flow has been exported as JSON. You can copy it or use it as needed.
+                Your chatbot flow has been processed. View the JSON or Payload format below.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <p className="text-sm text-muted-foreground">
-                  JSON has been logged to console and is ready to copy.
-                </p>
-                <Button onClick={handleCopyJson} variant="outline" size="sm" className="gap-2">
-                  <Copy className="w-4 h-4" />
-                  Copy JSON
-                </Button>
-              </div>
-              <Textarea
-                value={exportedJson}
-                readOnly
-                rows={20}
-                className="font-mono text-xs resize-none"
-                placeholder="JSON will appear here..."
-              />
-            </div>
+            
+            <Tabs defaultValue="json" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="json">JSON Format</TabsTrigger>
+                <TabsTrigger value="payload">Payload Format</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="json" className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <p className="text-sm text-muted-foreground">
+                    Raw JSON format - same as export
+                  </p>
+                  <Button onClick={() => handleCopyJson(exportedJson)} variant="outline" size="sm" className="gap-2">
+                    <Copy className="w-4 h-4" />
+                    Copy JSON
+                  </Button>
+                </div>
+                <Textarea
+                  value={exportedJson}
+                  readOnly
+                  rows={18}
+                  className="font-mono text-xs resize-none"
+                  placeholder="JSON will appear here..."
+                />
+              </TabsContent>
+              
+              <TabsContent value="payload" className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <p className="text-sm text-muted-foreground">
+                    Payload format - logged to console
+                  </p>
+                  <Button onClick={() => handleCopyJson(payloadData)} variant="outline" size="sm" className="gap-2">
+                    <Copy className="w-4 h-4" />
+                    Copy Payload
+                  </Button>
+                </div>
+                <Textarea
+                  value={payloadData}
+                  readOnly
+                  rows={18}
+                  className="font-mono text-xs resize-none"
+                  placeholder="Payload will appear here..."
+                />
+              </TabsContent>
+            </Tabs>
+
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setIsSubmitOpen(false)}>
                 Close
