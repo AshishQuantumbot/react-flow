@@ -80,8 +80,10 @@ export function NodeToolbar() {
       </p>
       <div className="space-y-1">
         {nodeTypes.map(({ type, icon, label, color }) => {
-          const disabled = type === "start" && hasStartNode;
-          const finalDisabled = hasEndNode === true ? true : disabled;
+          const disabled =
+            (type === "start" && hasStartNode) || // Only one Start
+            (type === "end" && !hasQuestionNode) || // End disabled until Question exists
+            (type === "question" && hasEndNode); // Question disabled after End
 
           return (
             <button
@@ -89,11 +91,11 @@ export function NodeToolbar() {
               draggable={!disabled}
               onDragStart={(e) => handleDragStart(e, type)}
               onClick={() => handleClick(type)}
-              disabled={finalDisabled}
+              disabled={disabled}
               className={cn(
                 "flex items-center gap-2 w-full px-3 py-2 rounded-md text-sm transition-all",
                 "hover:bg-secondary/50 active:scale-95",
-                finalDisabled && "opacity-40 cursor-not-allowed",
+                disabled && "opacity-40 cursor-not-allowed",
                 color,
               )}
             >

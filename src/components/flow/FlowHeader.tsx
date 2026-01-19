@@ -1,7 +1,20 @@
-import { useState, useEffect } from 'react';
-import { Download, Upload, CheckCircle, Bot, Sun, Moon, Play, Pause, Square, StepForward } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useFlowStore } from '@/store/flowStore';
+import { useState, useEffect } from "react";
+import {
+  Download,
+  Upload,
+  CheckCircle,
+  Bot,
+  Sun,
+  Moon,
+  Play,
+  Pause,
+  Square,
+  StepForward,
+  Send,
+  Copy,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useFlowStore } from "@/store/flowStore";
 import {
   Dialog,
   DialogContent,
@@ -9,14 +22,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/hooks/use-toast';
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 
 export function FlowHeader() {
-  const { 
-    exportFlow, 
-    importFlow, 
+  const {
+    exportFlow,
+    importFlow,
     validateFlow,
     execution,
     startExecution,
@@ -26,37 +39,41 @@ export function FlowHeader() {
     stepExecution,
   } = useFlowStore();
   const { toast } = useToast();
-  const [importJson, setImportJson] = useState('');
+  const [importJson, setImportJson] = useState("");
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isSubmitOpen, setIsSubmitOpen] = useState(false);
+  const [exportedJson, setExportedJson] = useState("");
   const [isDark, setIsDark] = useState(true);
 
   useEffect(() => {
-    const saved = localStorage.getItem('theme');
-    const prefersDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const saved = localStorage.getItem("theme");
+    const prefersDark =
+      saved === "dark" ||
+      (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches);
     setIsDark(prefersDark);
-    document.documentElement.classList.toggle('dark', prefersDark);
+    document.documentElement.classList.toggle("dark", prefersDark);
   }, []);
 
   const toggleTheme = () => {
     const newIsDark = !isDark;
     setIsDark(newIsDark);
-    document.documentElement.classList.toggle('dark', newIsDark);
-    localStorage.setItem('theme', newIsDark ? 'dark' : 'light');
+    document.documentElement.classList.toggle("dark", newIsDark);
+    localStorage.setItem("theme", newIsDark ? "dark" : "light");
   };
 
   const handleExport = () => {
     const json = exportFlow();
-    const blob = new Blob([json], { type: 'application/json' });
+    const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = 'chatbot-flow.json';
+    a.download = "chatbot-flow.json";
     a.click();
     URL.revokeObjectURL(url);
-    
+
     toast({
-      title: 'Flow Exported',
-      description: 'Your chatbot flow has been downloaded.',
+      title: "Flow Exported",
+      description: "Your chatbot flow has been downloaded.",
     });
   };
 
@@ -64,16 +81,16 @@ export function FlowHeader() {
     const success = importFlow(importJson);
     if (success) {
       toast({
-        title: 'Flow Imported',
-        description: 'Your chatbot flow has been loaded successfully.',
+        title: "Flow Imported",
+        description: "Your chatbot flow has been loaded successfully.",
       });
       setIsImportOpen(false);
-      setImportJson('');
+      setImportJson("");
     } else {
       toast({
-        title: 'Import Failed',
-        description: 'Invalid JSON format. Please check your file.',
-        variant: 'destructive',
+        title: "Import Failed",
+        description: "Invalid JSON format. Please check your file.",
+        variant: "destructive",
       });
     }
   };
@@ -82,14 +99,14 @@ export function FlowHeader() {
     const { valid, errors } = validateFlow();
     if (valid) {
       toast({
-        title: 'Flow Valid',
-        description: 'Your chatbot flow is ready to run!',
+        title: "Flow Valid",
+        description: "Your chatbot flow is ready to run!",
       });
     } else {
       toast({
-        title: 'Validation Errors',
-        description: errors.join('\n'),
-        variant: 'destructive',
+        title: "Validation Errors",
+        description: errors.join("\n"),
+        variant: "destructive",
       });
     }
   };
@@ -98,21 +115,55 @@ export function FlowHeader() {
     const { valid, errors } = validateFlow();
     if (!valid) {
       toast({
-        title: 'Cannot Run Flow',
+        title: "Cannot Run Flow",
         description: errors[0],
-        variant: 'destructive',
+        variant: "destructive",
       });
       return;
     }
     startExecution();
     toast({
-      title: 'Flow Started',
-      description: 'Use Step or Resume to navigate through the flow.',
+      title: "Flow Started",
+      description: "Use Step or Resume to navigate through the flow.",
     });
   };
 
   const handleStep = async () => {
     await stepExecution();
+  };
+
+  const handleSubmit = () => {
+    const { valid, errors } = validateFlow();
+    if (!valid) {
+      toast({
+        title: "Cannot Submit Flow",
+        description: errors[0],
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const json = exportFlow();
+    const formattedJson = JSON.stringify(JSON.parse(json), null, 2);
+    setExportedJson(formattedJson);
+    setIsSubmitOpen(true);
+    console.log("Flow JSON:", json);
+  };
+
+  const handleCopyJson = async () => {
+    try {
+      await navigator.clipboard.writeText(exportedJson);
+      toast({
+        title: "Copied!",
+        description: "JSON copied to clipboard.",
+      });
+    } catch (err) {
+      toast({
+        title: "Copy Failed",
+        description: "Could not copy to clipboard.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -122,19 +173,23 @@ export function FlowHeader() {
           <Bot className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <h1 className="font-semibold text-sm text-foreground">AI Flow Editor</h1>
-          <p className="text-xs text-muted-foreground">Visual Chatbot Builder</p>
+          <h1 className="font-semibold text-sm text-foreground">
+            AI Flow Editor
+          </h1>
+          <p className="text-xs text-muted-foreground">
+            Visual Chatbot Builder
+          </p>
         </div>
       </div>
-      
+
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={handleValidate} className="gap-2">
+        {/* <Button variant="ghost" size="sm" onClick={handleValidate} className="gap-2">
           <CheckCircle className="w-4 h-4" />
           Validate
-        </Button>
+        </Button> */}
 
         {/* Run Controls */}
-        <div className="flex items-center gap-1 px-2 border-l border-r border-border">
+        {/* <div className="flex items-center gap-1 px-2 border-l border-r border-border">
           {!execution.isRunning ? (
             <Button 
               variant="ghost" 
@@ -184,9 +239,23 @@ export function FlowHeader() {
               </Button>
             </>
           )}
-        </div>
-        
-        <Button variant="ghost" size="sm" onClick={handleExport} className="gap-2">
+        </div> */}
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleSubmit}
+          className="gap-2"
+        >
+          <Send className="w-4 h-4" />
+          Submit
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleExport}
+          className="gap-2"
+        >
           <Download className="w-4 h-4" />
           Export
         </Button>
@@ -217,6 +286,43 @@ export function FlowHeader() {
                 Cancel
               </Button>
               <Button onClick={handleImport}>Import</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isSubmitOpen} onOpenChange={setIsSubmitOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Send className="w-5 h-5" />
+                Flow JSON Output
+              </DialogTitle>
+              <DialogDescription>
+                Your chatbot flow has been exported as JSON. You can copy it or use it as needed.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-muted-foreground">
+                  JSON has been logged to console and is ready to copy.
+                </p>
+                <Button onClick={handleCopyJson} variant="outline" size="sm" className="gap-2">
+                  <Copy className="w-4 h-4" />
+                  Copy JSON
+                </Button>
+              </div>
+              <Textarea
+                value={exportedJson}
+                readOnly
+                rows={20}
+                className="font-mono text-xs resize-none"
+                placeholder="JSON will appear here..."
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setIsSubmitOpen(false)}>
+                Close
+              </Button>
             </div>
           </DialogContent>
         </Dialog>

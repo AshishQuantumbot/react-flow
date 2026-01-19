@@ -176,6 +176,24 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   onConnect: (connection) => {
+    const { nodes, edges } = get();
+    
+    // Prevent multiple outgoing connections from any node (single flow rule)
+    const sourceHasConnection = edges.some(e => e.source === connection.source);
+    if (sourceHasConnection) {
+      console.warn("Each node can only have one outgoing connection");
+      return;
+    }
+
+    // Prevent Start node from connecting directly to End node
+    const sourceNode = nodes.find(n => n.id === connection.source);
+    const targetNode = nodes.find(n => n.id === connection.target);
+    
+    if (sourceNode?.type === "start" && targetNode?.type === "end") {
+      console.warn("Start node cannot connect directly to End/CTA node");
+      return;
+    }
+
     set({
       edges: addEdge(
         {
@@ -267,51 +285,38 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       data: defaultData,
     };
 
-    // Auto-connect logic
+    // Auto-connect logic for single linear flow
     let sourceNodeId: string | null = null;
 
-    // If there's a selected node, try to connect from it
-    if (selectedNodeId) {
-      const selectedNode = nodes.find(n => n.id === selectedNodeId);
-      if (selectedNode && selectedNode.type !== "end") {
-        // Check if selected node already has an outgoing connection
-        const hasOutgoingConnection = edges.some(e => e.source === selectedNodeId);
-        if (!hasOutgoingConnection) {
-          sourceNodeId = selectedNodeId;
-        }
-      }
-    }
+    // Find the last node in the chain (node without outgoing connection)
+    const availableNodes = nodes.filter(n => 
+      n.type !== "end" && !edges.some(e => e.source === n.id)
+    );
 
-    // If no selected node or selected node can't connect, find the best candidate
-    if (!sourceNodeId) {
-      // Find the best node to connect from based on flow logic
-      const availableNodes = nodes.filter(n => 
-        n.type !== "end" && !edges.some(e => e.source === n.id)
-      );
-
-      if (availableNodes.length > 0) {
-        // Priority order for connecting:
-        // 1. Start node (if no connections)
-        // 2. Most recently added question/answer/condition node
-        // 3. Any other available node
-        
-        const startNode = availableNodes.find(n => n.type === "start");
-        const questionNodes = availableNodes.filter(n => n.type === "question");
-        const answerNodes = availableNodes.filter(n => n.type === "answer");
-        const conditionNodes = availableNodes.filter(n => n.type === "condition");
-        
-        if (startNode) {
-          sourceNodeId = startNode.id;
-        } else if (questionNodes.length > 0) {
-          // Connect from the most recently added question node
-          sourceNodeId = questionNodes[questionNodes.length - 1].id;
-        } else if (answerNodes.length > 0) {
-          sourceNodeId = answerNodes[answerNodes.length - 1].id;
-        } else if (conditionNodes.length > 0) {
-          sourceNodeId = conditionNodes[conditionNodes.length - 1].id;
+    if (availableNodes.length > 0) {
+      // Priority for single linear flow:
+      // 1. Start node (if no connections)
+      // 2. Most recently added node in the chain
+      
+      const startNode = availableNodes.find(n => n.type === "start");
+      
+      if (startNode) {
+        // If adding End node, ensure Start is not directly connected
+        if (type === "end") {
+          // Find the last non-start node in chain
+          const nonStartNodes = availableNodes.filter(n => n.type !== "start");
+          if (nonStartNodes.length > 0) {
+            sourceNodeId = nonStartNodes[nonStartNodes.length - 1].id;
+          } else {
+            console.warn("Cannot connect End directly to Start. Add at least one Question/Answer node first.");
+            return;
+          }
         } else {
-          sourceNodeId = availableNodes[availableNodes.length - 1].id;
+          sourceNodeId = startNode.id;
         }
+      } else {
+        // Connect to the most recently added available node
+        sourceNodeId = availableNodes[availableNodes.length - 1].id;
       }
     }
 
@@ -464,6 +469,24 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       errors.push("Flow must have at least one CTA node");
     }
 
+    // Check for single linear flow (no branching)
+    nodes.forEach((node) => {
+      const outgoingEdges = edges.filter((e) => e.source === node.id);
+      if (outgoingEdges.length > 1 && node.type !== "condition") {
+        errors.push(`Node "${node.data.label}" has multiple outgoing connections. Only single linear flow is allowed.`);
+      }
+    });
+
+    // Check Start node doesn't connect directly to End
+    if (startNodes.length > 0 && endNodes.length > 0) {
+      const startToEndConnection = edges.some(
+        (e) => e.source === startNodes[0].id && endNodes.some(end => end.id === e.target)
+      );
+      if (startToEndConnection) {
+        errors.push("Start node cannot connect directly to End/CTA node. Add at least one Question or Answer node.");
+      }
+    }
+
     // Check for unconnected nodes
     const connectedNodeIds = new Set<string>();
     edges.forEach((edge) => {
@@ -512,7 +535,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       errors.push("Flow contains an infinite loop");
     }
 
-    // Check condition nodes have both outputs
+    // Check condition nodes have both outputs (exception to single flow rule)
     const conditionNodes = nodes.filter((n) => n.type === "condition");
     conditionNodes.forEach((node) => {
       const outEdges = edges.filter((e) => e.source === node.id);
