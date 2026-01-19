@@ -17,14 +17,14 @@ import { useReactFlow } from '@xyflow/react';
 const nodeTypes: { type: NodeType; icon: React.ReactNode; label: string; color: string }[] = [
   { type: 'start', icon: <Play className="w-4 h-4" />, label: 'Start', color: 'text-node-start' },
   { type: 'question', icon: <MessageCircleQuestion className="w-4 h-4" />, label: 'Question', color: 'text-node-question' },
-  { type: 'answer', icon: <MessageSquare className="w-4 h-4" />, label: 'Answer', color: 'text-node-answer' },
-  { type: 'ai', icon: <Sparkles className="w-4 h-4" />, label: 'AI Prompt', color: 'text-node-ai' },
-  { type: 'condition', icon: <GitBranch className="w-4 h-4" />, label: 'Condition', color: 'text-node-condition' },
-  { type: 'api', icon: <Globe className="w-4 h-4" />, label: 'API', color: 'text-node-api' },
-  { type: 'delay', icon: <Timer className="w-4 h-4" />, label: 'Delay', color: 'text-node-delay' },
-  { type: 'fallback', icon: <ShieldAlert className="w-4 h-4" />, label: 'Fallback', color: 'text-node-fallback' },
-  { type: 'handoff', icon: <UserCheck className="w-4 h-4" />, label: 'Handoff', color: 'text-node-handoff' },
-  { type: 'end', icon: <Square className="w-4 h-4" />, label: 'End', color: 'text-node-end' },
+  // { type: 'answer', icon: <MessageSquare className="w-4 h-4" />, label: 'Answer', color: 'text-node-answer' },
+  // { type: 'ai', icon: <Sparkles className="w-4 h-4" />, label: 'AI Prompt', color: 'text-node-ai' },
+  // { type: 'condition', icon: <GitBranch className="w-4 h-4" />, label: 'Condition', color: 'text-node-condition' },
+  // { type: 'api', icon: <Globe className="w-4 h-4" />, label: 'API', color: 'text-node-api' },
+  // { type: 'delay', icon: <Timer className="w-4 h-4" />, label: 'Delay', color: 'text-node-delay' },
+  // { type: 'fallback', icon: <ShieldAlert className="w-4 h-4" />, label: 'Fallback', color: 'text-node-fallback' },
+  // { type: 'handoff', icon: <UserCheck className="w-4 h-4" />, label: 'Handoff', color: 'text-node-handoff' },
+  { type: 'end', icon: <Square className="w-4 h-4" />, label: 'CTA', color: 'text-node-end' },
 ];
 
 export function NodeToolbar() {

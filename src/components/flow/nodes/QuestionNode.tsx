@@ -8,7 +8,6 @@ type FlowNode = Node<FlowNodeData>;
 
 export const QuestionNode = memo(function QuestionNode(props: NodeProps<FlowNode>) {
   const { data } = props;
-  
   return (
     <BaseNode
       {...props}

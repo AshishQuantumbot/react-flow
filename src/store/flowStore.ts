@@ -1,10 +1,34 @@
-import { create } from 'zustand';
-import { Node, Edge, Connection, addEdge, applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange } from '@xyflow/react';
+import { create } from "zustand";
+import {
+  Node,
+  Edge,
+  Connection,
+  addEdge,
+  applyNodeChanges,
+  applyEdgeChanges,
+  NodeChange,
+  EdgeChange,
+} from "@xyflow/react";
 
-export type NodeType = 'start' | 'question' | 'answer' | 'condition' | 'api' | 'end' | 'ai' | 'fallback' | 'delay' | 'handoff';
+export type NodeType =
+  | "start"
+  | "question"
+  | "answer"
+  | "condition"
+  | "api"
+  | "end"
+  | "ai"
+  | "fallback"
+  | "delay"
+  | "handoff";
+
+export type MeetingType = "meeting-schedule" | "site-visit" | "demo-booking";
 
 export interface FlowNodeData {
   label: string;
+  weight?: number;
+  threshold?: number;
+  meetingType?: MeetingType;
   question?: string;
   answer?: string;
   aiPrompt?: string;
@@ -20,18 +44,25 @@ export interface FlowNodeData {
   };
   conditions?: {
     variable: string;
-    operator: 'equals' | 'contains' | 'greater' | 'less' | 'exists' | 'intent' | 'confidence';
+    operator:
+      | "equals"
+      | "contains"
+      | "greater"
+      | "less"
+      | "exists"
+      | "intent"
+      | "confidence";
     value: string;
     trueNodeId?: string;
     falseNodeId?: string;
   };
   delayConfig?: {
     duration: number;
-    unit: 'seconds' | 'minutes' | 'hours';
+    unit: "seconds" | "minutes" | "hours";
   };
   handoffConfig?: {
     department?: string;
-    priority?: 'low' | 'medium' | 'high';
+    priority?: "low" | "medium" | "high";
     message?: string;
   };
   fallbackConfig?: {
@@ -42,7 +73,8 @@ export interface FlowNodeData {
     read?: string[];
     write?: { key: string; value: string }[];
   };
-  channel?: 'all' | 'web' | 'whatsapp' | 'telegram' | 'facebook';
+  channel?: "all" | "web" | "whatsapp" | "telegram" | "facebook";
+  required?: string;
   [key: string]: unknown;
 }
 
@@ -71,7 +103,7 @@ interface FlowState {
   selectedNodeId: string | null;
   isPanelOpen: boolean;
   execution: ExecutionState;
-  
+
   // Actions
   setNodes: (nodes: Node<FlowNodeData>[]) => void;
   setEdges: (edges: Edge[]) => void;
@@ -86,7 +118,7 @@ interface FlowState {
   exportFlow: () => string;
   importFlow: (json: string) => boolean;
   validateFlow: () => { valid: boolean; errors: string[] };
-  
+
   // Execution actions
   startExecution: () => void;
   pauseExecution: () => void;
@@ -100,10 +132,10 @@ interface FlowState {
 
 const initialNodes: Node<FlowNodeData>[] = [
   {
-    id: 'start-1',
-    type: 'start',
+    id: "start-1",
+    type: "start",
     position: { x: 250, y: 50 },
-    data: { label: 'Start' },
+    data: { label: "Start" },
   },
 ];
 
@@ -118,7 +150,8 @@ const initialExecutionState: ExecutionState = {
   },
 };
 
-const generateId = () => `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+const generateId = () =>
+  `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 export const useFlowStore = create<FlowState>((set, get) => ({
   nodes: initialNodes,
@@ -150,29 +183,29 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           animated: true,
           style: { strokeWidth: 2 },
         },
-        get().edges
+        get().edges,
       ),
     });
   },
 
   addNode: (type, position) => {
     const { nodes } = get();
-    
-    if (type === 'start' && nodes.some(n => n.type === 'start')) {
+
+    if (type === "start" && nodes.some((n) => n.type === "start")) {
       return;
     }
 
     const labels: Record<NodeType, string> = {
-      start: 'Start',
-      question: 'Question',
-      answer: 'Answer',
-      condition: 'Condition',
-      api: 'API Call',
-      end: 'End',
-      ai: 'AI Prompt',
-      fallback: 'Fallback',
-      delay: 'Delay',
-      handoff: 'Human Handoff',
+      start: "Start",
+      question: "Question",
+      answer: "Answer",
+      condition: "Condition",
+      api: "API Call",
+      end: "End",
+      ai: "AI Prompt",
+      fallback: "Fallback",
+      delay: "Delay",
+      handoff: "Human Handoff",
     };
 
     const newNode: Node<FlowNodeData> = {
@@ -190,7 +223,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       nodes: get().nodes.map((node) =>
         node.id === nodeId
           ? { ...node, data: { ...node.data, ...data } }
-          : node
+          : node,
       ),
     });
   },
@@ -210,12 +243,15 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   setPanelOpen: (open) => {
-    set({ isPanelOpen: open, selectedNodeId: open ? get().selectedNodeId : null });
+    set({
+      isPanelOpen: open,
+      selectedNodeId: open ? get().selectedNodeId : null,
+    });
   },
 
   exportFlow: () => {
     const { nodes, edges } = get();
-    return JSON.stringify({ nodes, edges, version: '2.0' }, null, 2);
+    return JSON.stringify({ nodes, edges, version: "2.0" }, null, 2);
   },
 
   importFlow: (json) => {
@@ -236,17 +272,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const errors: string[] = [];
 
     // Check for start node
-    const startNodes = nodes.filter((n) => n.type === 'start');
+    const startNodes = nodes.filter((n) => n.type === "start");
     if (startNodes.length === 0) {
-      errors.push('Flow must have a Start node');
+      errors.push("Flow must have a Start node");
     } else if (startNodes.length > 1) {
-      errors.push('Flow can only have one Start node');
+      errors.push("Flow can only have one Start node");
     }
 
     // Check for end node
-    const endNodes = nodes.filter((n) => n.type === 'end');
+    const endNodes = nodes.filter((n) => n.type === "end");
     if (endNodes.length === 0) {
-      errors.push('Flow must have at least one End node');
+      errors.push("Flow must have at least one End node");
     }
 
     // Check for unconnected nodes
@@ -257,28 +293,30 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     });
 
     nodes.forEach((node) => {
-      if (node.type !== 'start' && !connectedNodeIds.has(node.id)) {
+      if (node.type !== "start" && !connectedNodeIds.has(node.id)) {
         errors.push(`Node "${node.data.label}" is not connected`);
       }
     });
 
     // Check if start has outgoing connection
     if (startNodes.length > 0) {
-      const startHasConnection = edges.some((e) => e.source === startNodes[0].id);
+      const startHasConnection = edges.some(
+        (e) => e.source === startNodes[0].id,
+      );
       if (!startHasConnection) {
-        errors.push('Start node must have an outgoing connection');
+        errors.push("Start node must have an outgoing connection");
       }
     }
 
     // Check for infinite loops
     const visited = new Set<string>();
     const recursionStack = new Set<string>();
-    
+
     const hasCycle = (nodeId: string): boolean => {
       visited.add(nodeId);
       recursionStack.add(nodeId);
-      
-      const outgoingEdges = edges.filter(e => e.source === nodeId);
+
+      const outgoingEdges = edges.filter((e) => e.source === nodeId);
       for (const edge of outgoingEdges) {
         if (!visited.has(edge.target)) {
           if (hasCycle(edge.target)) return true;
@@ -286,21 +324,23 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           return true;
         }
       }
-      
+
       recursionStack.delete(nodeId);
       return false;
     };
 
     if (startNodes.length > 0 && hasCycle(startNodes[0].id)) {
-      errors.push('Flow contains an infinite loop');
+      errors.push("Flow contains an infinite loop");
     }
 
     // Check condition nodes have both outputs
-    const conditionNodes = nodes.filter(n => n.type === 'condition');
-    conditionNodes.forEach(node => {
-      const outEdges = edges.filter(e => e.source === node.id);
+    const conditionNodes = nodes.filter((n) => n.type === "condition");
+    conditionNodes.forEach((node) => {
+      const outEdges = edges.filter((e) => e.source === node.id);
       if (outEdges.length < 2) {
-        errors.push(`Condition node "${node.data.label}" needs both TRUE and FALSE paths`);
+        errors.push(
+          `Condition node "${node.data.label}" needs both TRUE and FALSE paths`,
+        );
       }
     });
 
@@ -310,8 +350,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // Execution actions
   startExecution: () => {
     const { nodes } = get();
-    const startNode = nodes.find(n => n.type === 'start');
-    
+    const startNode = nodes.find((n) => n.type === "start");
+
     set({
       execution: {
         isRunning: true,
@@ -344,66 +384,69 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   stepExecution: async () => {
     const { nodes, edges, execution } = get();
-    
+
     if (!execution.currentNodeId || !execution.isRunning) return;
-    
-    const currentNode = nodes.find(n => n.id === execution.currentNodeId);
+
+    const currentNode = nodes.find((n) => n.id === execution.currentNodeId);
     if (!currentNode) return;
 
     // Find next node based on edges
     let nextNodeId: string | null = null;
-    
-    if (currentNode.type === 'condition') {
+
+    if (currentNode.type === "condition") {
       // Handle condition routing
       const condition = currentNode.data.conditions;
       let result = false;
-      
+
       if (condition) {
         const contextValue = execution.context.variables[condition.variable];
         switch (condition.operator) {
-          case 'equals':
+          case "equals":
             result = String(contextValue) === condition.value;
             break;
-          case 'contains':
+          case "contains":
             result = String(contextValue).includes(condition.value);
             break;
-          case 'greater':
+          case "greater":
             result = Number(contextValue) > Number(condition.value);
             break;
-          case 'less':
+          case "less":
             result = Number(contextValue) < Number(condition.value);
             break;
-          case 'exists':
+          case "exists":
             result = contextValue !== undefined && contextValue !== null;
             break;
-          case 'intent':
+          case "intent":
             result = execution.context.currentIntent === condition.value;
             break;
-          case 'confidence':
-            result = (execution.context.intentConfidence || 0) >= Number(condition.value);
+          case "confidence":
+            result =
+              (execution.context.intentConfidence || 0) >=
+              Number(condition.value);
             break;
         }
       }
-      
+
       // Find TRUE or FALSE edge based on sourceHandle
-      const matchingEdge = edges.find(e => 
-        e.source === currentNode.id && 
-        (result ? e.sourceHandle === 'true' : e.sourceHandle === 'false')
+      const matchingEdge = edges.find(
+        (e) =>
+          e.source === currentNode.id &&
+          (result ? e.sourceHandle === "true" : e.sourceHandle === "false"),
       );
       nextNodeId = matchingEdge?.target || null;
-    } else if (currentNode.type === 'end') {
+    } else if (currentNode.type === "end") {
       // End execution
       set((state) => ({
-        execution: { 
-          ...state.execution, 
-          isRunning: false, 
-          currentNodeId: null 
+        execution: {
+          ...state.execution,
+          isRunning: false,
+          currentNodeId: null,
         },
       }));
       return;
     } else {
       // Normal flow - find first outgoing edge
-      const outEdge = edges.find(e => e.source === currentNode.id);
+      const outEdge = edges.find((e) => e.source === currentNode.id);
       nextNodeId = outEdge?.target || null;
     }
 
@@ -418,10 +461,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     } else {
       // No next node found
       set((state) => ({
-        execution: { 
-          ...state.execution, 
+        execution: {
+          ...state.execution,
           isRunning: false,
-          error: 'No next node found - flow incomplete',
+          error: "No next node found - flow incomplete",
         },
       }));
     }
