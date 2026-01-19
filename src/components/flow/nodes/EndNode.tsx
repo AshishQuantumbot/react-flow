@@ -15,7 +15,7 @@ export const EndNode = memo(function EndNode(props: NodeProps<FlowNode>) {
       glowClass="node-glow-end"
       showSourceHandle={false}
     >
-      <p className="text-xs text-muted-foreground">End conversation</p>
+      <p className="text-xs text-muted-foreground">CTA conversation</p>
     </BaseNode>
   );
 });

@@ -201,7 +201,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       answer: "Answer",
       condition: "Condition",
       api: "API Call",
-      end: "End",
+      end: "CTA",
       ai: "AI Prompt",
       fallback: "Fallback",
       delay: "Delay",

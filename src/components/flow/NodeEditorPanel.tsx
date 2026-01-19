@@ -77,7 +77,7 @@ export function NodeEditorPanel() {
     answer: "Answer Node",
     condition: "Condition Node",
     api: "API Node",
-    end: "End Node",
+    end: "CTA Node",
     ai: "AI Prompt Node",
     fallback: "Fallback Node",
     delay: "Delay Node",
