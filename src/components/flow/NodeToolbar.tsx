@@ -61,6 +61,7 @@ export function NodeToolbar() {
 
   const handleClick = (nodeType: NodeType) => {
     if (nodeType === "start" && hasStartNode) return;
+    if (nodeType === "end" && hasEndNode) return;
 
     const position = screenToFlowPosition({
       x: window.innerWidth / 2,
@@ -78,7 +79,7 @@ export function NodeToolbar() {
         {nodeTypes.map(({ type, icon, label, color }) => {
           const disabled =
             (type === "start" && hasStartNode) || // Only one Start
-            (type === "end" && !hasQuestionNode) || // End disabled until Question exists
+            (type === "end" && (hasEndNode || !hasQuestionNode)) || // Only one End, and End disabled until Question exists
             (type === "question" && hasEndNode); // Question disabled after End
 
           return (
