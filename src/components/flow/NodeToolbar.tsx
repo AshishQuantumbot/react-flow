@@ -32,7 +32,6 @@ const nodeTypes: {
     label: "Question",
     color: "text-node-question",
   },
-  // { type: 'answer', icon: <MessageSquare className="w-4 h-4" />, label: 'Answer', color: 'text-node-answer' },
   // { type: 'ai', icon: <Sparkles className="w-4 h-4" />, label: 'AI Prompt', color: 'text-node-ai' },
   // { type: 'condition', icon: <GitBranch className="w-4 h-4" />, label: 'Condition', color: 'text-node-condition' },
   // { type: 'api', icon: <Globe className="w-4 h-4" />, label: 'API', color: 'text-node-api' },
@@ -62,6 +61,7 @@ export function NodeToolbar() {
   const handleClick = (nodeType: NodeType) => {
     if (nodeType === "start" && hasStartNode) return;
     if (nodeType === "end" && hasEndNode) return;
+    // Removed Question restriction - Questions can now be added anytime
 
     const position = screenToFlowPosition({
       x: window.innerWidth / 2,
@@ -79,8 +79,7 @@ export function NodeToolbar() {
         {nodeTypes.map(({ type, icon, label, color }) => {
           const disabled =
             (type === "start" && hasStartNode) || // Only one Start
-            (type === "end" && (hasEndNode || !hasQuestionNode)) || // Only one End, and End disabled until Question exists
-            (type === "question" && hasEndNode); // Question disabled after End
+            (type === "end" && hasEndNode); // Only one End (removed Question requirement)
 
           return (
             <button

@@ -137,6 +137,12 @@ const initialNodes: Node<FlowNodeData>[] = [
     position: { x: 250, y: 50 },
     data: { label: "Start" },
   },
+  {
+    id: "end-1",
+    type: "end",
+    position: { x: 250, y: 300 },
+    data: { label: "CTA", meetingType: "meeting-schedule" },
+  },
 ];
 
 const initialExecutionState: ExecutionState = {
@@ -178,19 +184,24 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   onConnect: (connection) => {
     const { nodes, edges } = get();
     
-    // Prevent multiple outgoing connections from any node (single flow rule)
-    const sourceHasConnection = edges.some(e => e.source === connection.source);
-    if (sourceHasConnection) {
-      console.warn("Each node can only have one outgoing connection");
-      return;
-    }
+    // Allow multiple outgoing connections (removed single flow restriction)
+    // Now Start can connect to multiple Questions, Questions can connect to Questions, etc.
 
-    // Prevent Start node from connecting directly to End node
+    // Still prevent Start node from connecting directly to End node
     const sourceNode = nodes.find(n => n.id === connection.source);
     const targetNode = nodes.find(n => n.id === connection.target);
     
     if (sourceNode?.type === "start" && targetNode?.type === "end") {
       console.warn("Start node cannot connect directly to End/CTA node");
+      return;
+    }
+
+    // Prevent duplicate connections
+    const connectionExists = edges.some(
+      e => e.source === connection.source && e.target === connection.target
+    );
+    if (connectionExists) {
+      console.warn("Connection already exists");
       return;
     }
 
@@ -213,15 +224,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       return;
     }
 
-    // Prevent adding end/CTA nodes if there are no question nodes
-    if (type === "end") {
-      const hasQuestionNodes = nodes.some((n) => n.type === "question");
-      if (!hasQuestionNodes) {
-        // You could show a toast/alert here if needed
-        console.warn("Cannot add End/CTA node without at least one Question node");
-        return;
-      }
-    }
+    // Allow adding end/CTA nodes (removed the restriction)
+    // The restriction was preventing End nodes without Question nodes
+    // but we want End nodes to be available by default
 
     const baseLabels: Record<NodeType, string> = {
       start: "Start",
@@ -285,38 +290,38 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       data: defaultData,
     };
 
-    // Auto-connect logic for single linear flow
+    // Auto-connect logic for multiple connections
     let sourceNodeId: string | null = null;
 
-    // Find the last node in the chain (node without outgoing connection)
-    const availableNodes = nodes.filter(n => 
-      n.type !== "end" && !edges.some(e => e.source === n.id)
-    );
+    // Find nodes that can connect to the new node
+    const availableNodes = nodes.filter(n => n.type !== "end");
 
-    if (availableNodes.length > 0) {
-      // Priority for single linear flow:
-      // 1. Start node (if no connections)
-      // 2. Most recently added node in the chain
+    if (availableNodes.length > 0 && type !== "start") {
+      // Don't auto-connect Start nodes, but auto-connect others
       
-      const startNode = availableNodes.find(n => n.type === "start");
-      
-      if (startNode) {
-        // If adding End node, ensure Start is not directly connected
-        if (type === "end") {
-          // Find the last non-start node in chain
-          const nonStartNodes = availableNodes.filter(n => n.type !== "start");
-          if (nonStartNodes.length > 0) {
-            sourceNodeId = nonStartNodes[nonStartNodes.length - 1].id;
-          } else {
-            console.warn("Cannot connect End directly to Start. Add at least one Question/Answer node first.");
-            return;
-          }
-        } else {
-          sourceNodeId = startNode.id;
+      if (type === "end") {
+        // For End nodes, connect to the most recently added Question node
+        const questionNodes = availableNodes.filter(n => n.type === "question");
+        if (questionNodes.length > 0) {
+          sourceNodeId = questionNodes[questionNodes.length - 1].id;
         }
       } else {
-        // Connect to the most recently added available node
-        sourceNodeId = availableNodes[availableNodes.length - 1].id;
+        // For Question nodes, connect to Start if it has no connections, otherwise to the last Question
+        const startNode = availableNodes.find(n => n.type === "start");
+        const startHasConnections = edges.some(e => e.source === startNode?.id);
+        
+        if (startNode && !startHasConnections) {
+          sourceNodeId = startNode.id;
+        } else {
+          // Connect to the most recently added Question node
+          const questionNodes = availableNodes.filter(n => n.type === "question");
+          if (questionNodes.length > 0) {
+            sourceNodeId = questionNodes[questionNodes.length - 1].id;
+          } else if (startNode) {
+            // If no Questions exist, connect to Start (allowing multiple connections from Start)
+            sourceNodeId = startNode.id;
+          }
+        }
       }
     }
 
@@ -359,60 +364,42 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     let nodesToDelete = [nodeId];
     let edgesToDelete = edges.filter((e) => e.source === nodeId || e.target === nodeId);
 
-    // Smart reconnection logic
-    const incomingEdge = edges.find((e) => e.target === nodeId);
+    // Smart reconnection logic for multiple connections
+    const incomingEdges = edges.filter((e) => e.target === nodeId);
     const outgoingEdges = edges.filter((e) => e.source === nodeId);
     
     let newEdges = edges.filter((e) => !edgesToDelete.some((del) => del.id === e.id));
 
-    // If the deleted node was in the middle of a chain, reconnect the chain
-    if (incomingEdge && outgoingEdges.length > 0) {
-      // For each outgoing connection, create a new connection from the incoming source
-      outgoingEdges.forEach((outEdge) => {
-        const newEdge = {
-          id: `edge-${incomingEdge.source}-${outEdge.target}`,
-          source: incomingEdge.source,
-          target: outEdge.target,
-          animated: true,
-          style: { strokeWidth: 2 },
-          // Preserve sourceHandle and targetHandle if they exist
-          ...(outEdge.sourceHandle && { sourceHandle: incomingEdge.sourceHandle }),
-          ...(outEdge.targetHandle && { targetHandle: outEdge.targetHandle }),
-        };
-        
-        // Only add if this connection doesn't already exist
-        const connectionExists = newEdges.some(
-          (e) => e.source === newEdge.source && e.target === newEdge.target
-        );
-        
-        if (!connectionExists) {
-          newEdges.push(newEdge);
-        }
+    // If the deleted node was in the middle of connections, reconnect appropriately
+    if (incomingEdges.length > 0 && outgoingEdges.length > 0) {
+      // For each incoming connection, connect to each outgoing connection
+      incomingEdges.forEach((inEdge) => {
+        outgoingEdges.forEach((outEdge) => {
+          const newEdge = {
+            id: `edge-${inEdge.source}-${outEdge.target}`,
+            source: inEdge.source,
+            target: outEdge.target,
+            animated: true,
+            style: { strokeWidth: 2 },
+            // Preserve sourceHandle and targetHandle if they exist
+            ...(inEdge.sourceHandle && { sourceHandle: inEdge.sourceHandle }),
+            ...(outEdge.targetHandle && { targetHandle: outEdge.targetHandle }),
+          };
+          
+          // Only add if this connection doesn't already exist
+          const connectionExists = newEdges.some(
+            (e) => e.source === newEdge.source && e.target === newEdge.target
+          );
+          
+          if (!connectionExists) {
+            newEdges.push(newEdge);
+          }
+        });
       });
     }
 
-    // If deleting a question node, check if we need to delete end/CTA nodes
-    if (nodeToDelete.type === "question") {
-      // Count remaining question nodes after this deletion
-      const remainingQuestionNodes = nodes.filter(
-        (n) => n.type === "question" && n.id !== nodeId
-      );
-
-      // If no question nodes will remain, delete all end/CTA nodes
-      if (remainingQuestionNodes.length === 0) {
-        const endNodesToDelete = nodes
-          .filter((n) => n.type === "end")
-          .map((n) => n.id);
-        
-        nodesToDelete = [...nodesToDelete, ...endNodesToDelete];
-        
-        // Also remove edges connected to end nodes
-        const additionalEdgesToDelete = newEdges.filter((e) => 
-          endNodesToDelete.includes(e.source) || endNodesToDelete.includes(e.target)
-        );
-        newEdges = newEdges.filter((e) => !additionalEdgesToDelete.some((del) => del.id === e.id));
-      }
-    }
+    // If deleting a question node, we no longer automatically delete end nodes
+    // End nodes can exist independently now
 
     set({
       nodes: nodes.filter((n) => !nodesToDelete.includes(n.id)),
@@ -469,13 +456,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       errors.push("Flow must have at least one CTA node");
     }
 
-    // Check for single linear flow (no branching)
-    nodes.forEach((node) => {
-      const outgoingEdges = edges.filter((e) => e.source === node.id);
-      if (outgoingEdges.length > 1 && node.type !== "condition") {
-        errors.push(`Node "${node.data.label}" has multiple outgoing connections. Only single linear flow is allowed.`);
-      }
-    });
+    // Allow multiple connections (removed single linear flow restriction)
+    // Only condition nodes still need special handling for TRUE/FALSE paths
 
     // Check Start node doesn't connect directly to End
     if (startNodes.length > 0 && endNodes.length > 0) {
@@ -483,11 +465,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         (e) => e.source === startNodes[0].id && endNodes.some(end => end.id === e.target)
       );
       if (startToEndConnection) {
-        errors.push("Start node cannot connect directly to End/CTA node. Add at least one Question or Answer node.");
+        errors.push("Start node cannot connect directly to End/CTA node. Add at least one Question node between them.");
       }
     }
 
-    // Check for unconnected nodes
+    // Check for unconnected nodes (more flexible with multiple connections)
     const connectedNodeIds = new Set<string>();
     edges.forEach((edge) => {
       connectedNodeIds.add(edge.source);
@@ -495,18 +477,23 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     });
 
     nodes.forEach((node) => {
-      if (node.type !== "start" && !connectedNodeIds.has(node.id)) {
-        errors.push(`Node "${node.data.label}" is not connected`);
+      // Allow Start and End nodes to be unconnected initially
+      // Question nodes should be connected in a multiple connection flow
+      if (node.type === "question" && !connectedNodeIds.has(node.id)) {
+        errors.push(`Question node "${node.data.label}" is not connected`);
       }
     });
 
-    // Check if start has outgoing connection
+    // Check if start has outgoing connections when there are Question nodes
     if (startNodes.length > 0) {
-      const startHasConnection = edges.some(
-        (e) => e.source === startNodes[0].id,
-      );
-      if (!startHasConnection) {
-        errors.push("Start node must have an outgoing connection");
+      const questionNodes = nodes.filter(n => n.type === "question");
+      if (questionNodes.length > 0) {
+        const startHasConnection = edges.some(
+          (e) => e.source === startNodes[0].id,
+        );
+        if (!startHasConnection) {
+          errors.push("Start node should connect to at least one Question node");
+        }
       }
     }
 
