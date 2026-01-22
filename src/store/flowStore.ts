@@ -475,22 +475,23 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       }
     }
 
-    // Check for proper connections - ALL Questions must be connected
+    // Check for proper connections - ALL Questions must be in valid paths
     const connectedNodeIds = new Set<string>();
     edges.forEach((edge) => {
       connectedNodeIds.add(edge.source);
       connectedNodeIds.add(edge.target);
     });
 
-    // If Questions exist, they ALL must be connected
+    // If Questions exist, they ALL must be connected AND in valid paths
     if (questionNodes.length > 0) {
+      // First check basic connectivity
       questionNodes.forEach((node) => {
         if (!connectedNodeIds.has(node.id)) {
           errors.push(`Question node "${node.data.label}" is not connected`);
         }
       });
       
-      // Start must connect to at least one Question
+      // Check if Start connects to at least one Question
       if (startNodes.length > 0) {
         const startHasConnection = edges.some(
           (e) => e.source === startNodes[0].id,
@@ -500,7 +501,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         }
       }
 
-      // At least one Question must connect to End/CTA
+      // Check if at least one Question connects to End/CTA
       if (endNodes.length > 0) {
         const endHasIncomingConnection = edges.some(
           (e) => endNodes.some(end => end.id === e.target)
@@ -508,6 +509,53 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         if (!endHasIncomingConnection) {
           errors.push("Please connect at least one Question node to the End/CTA node");
         }
+      }
+
+      // ADVANCED PATH VALIDATION: Ensure all Questions are in valid Start→End paths
+      // This prevents scenarios where Questions are connected but not part of valid flow
+      if (startNodes.length > 0 && endNodes.length > 0) {
+        const startNodeId = startNodes[0].id;
+        const endNodeIds = endNodes.map(n => n.id);
+
+        // Find all nodes reachable from Start (forward traversal)
+        const reachableFromStart = new Set<string>();
+        const findReachableFromStart = (nodeId: string) => {
+          if (reachableFromStart.has(nodeId)) return;
+          reachableFromStart.add(nodeId);
+          
+          const outgoingEdges = edges.filter(e => e.source === nodeId);
+          outgoingEdges.forEach(edge => {
+            findReachableFromStart(edge.target);
+          });
+        };
+        findReachableFromStart(startNodeId);
+
+        // Find all nodes that can reach End (backward traversal)
+        const canReachEnd = new Set<string>();
+        const findCanReachEnd = (nodeId: string) => {
+          if (canReachEnd.has(nodeId)) return;
+          canReachEnd.add(nodeId);
+          
+          const incomingEdges = edges.filter(e => e.target === nodeId);
+          incomingEdges.forEach(edge => {
+            findCanReachEnd(edge.source);
+          });
+        };
+        endNodeIds.forEach(endId => findCanReachEnd(endId));
+
+        // Validate each Question is in a complete Start→End path
+        questionNodes.forEach((node) => {
+          const isReachableFromStart = reachableFromStart.has(node.id);
+          const canReachEndCTA = canReachEnd.has(node.id);
+          
+          if (!isReachableFromStart) {
+            errors.push(`Question node "${node.data.label}" is not reachable from Start node`);
+          }
+          
+          if (!canReachEndCTA) {
+            errors.push(`Question node "${node.data.label}" does not lead to End/CTA node`);
+          }
+        });
       }
     }
 
