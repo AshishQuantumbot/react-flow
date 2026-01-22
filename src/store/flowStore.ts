@@ -456,6 +456,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       errors.push("Flow must have at least one CTA node");
     }
 
+    // REQUIRE at least one Question node for submission
+    const questionNodes = nodes.filter(n => n.type === "question");
+    if (questionNodes.length === 0) {
+      errors.push("Please add at least one Question node to create a valid flow");
+    }
+
     // Allow multiple connections (removed single linear flow restriction)
     // Only condition nodes still need special handling for TRUE/FALSE paths
 
@@ -469,57 +475,67 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       }
     }
 
-    // Check for unconnected nodes (more flexible with multiple connections)
+    // Check for proper connections - ALL Questions must be connected
     const connectedNodeIds = new Set<string>();
     edges.forEach((edge) => {
       connectedNodeIds.add(edge.source);
       connectedNodeIds.add(edge.target);
     });
 
-    nodes.forEach((node) => {
-      // Allow Start and End nodes to be unconnected initially
-      // Question nodes should be connected in a multiple connection flow
-      if (node.type === "question" && !connectedNodeIds.has(node.id)) {
-        errors.push(`Question node "${node.data.label}" is not connected`);
-      }
-    });
-
-    // Check if start has outgoing connections when there are Question nodes
-    if (startNodes.length > 0) {
-      const questionNodes = nodes.filter(n => n.type === "question");
-      if (questionNodes.length > 0) {
+    // If Questions exist, they ALL must be connected
+    if (questionNodes.length > 0) {
+      questionNodes.forEach((node) => {
+        if (!connectedNodeIds.has(node.id)) {
+          errors.push(`Question node "${node.data.label}" is not connected`);
+        }
+      });
+      
+      // Start must connect to at least one Question
+      if (startNodes.length > 0) {
         const startHasConnection = edges.some(
           (e) => e.source === startNodes[0].id,
         );
         if (!startHasConnection) {
-          errors.push("Start node should connect to at least one Question node");
+          errors.push("Please connect the Start node to at least one Question node");
+        }
+      }
+
+      // At least one Question must connect to End/CTA
+      if (endNodes.length > 0) {
+        const endHasIncomingConnection = edges.some(
+          (e) => endNodes.some(end => end.id === e.target)
+        );
+        if (!endHasIncomingConnection) {
+          errors.push("Please connect at least one Question node to the End/CTA node");
         }
       }
     }
 
-    // Check for infinite loops
-    const visited = new Set<string>();
-    const recursionStack = new Set<string>();
+    // Check for infinite loops (only if there are connections)
+    if (startNodes.length > 0 && edges.length > 0) {
+      const visited = new Set<string>();
+      const recursionStack = new Set<string>();
 
-    const hasCycle = (nodeId: string): boolean => {
-      visited.add(nodeId);
-      recursionStack.add(nodeId);
+      const hasCycle = (nodeId: string): boolean => {
+        visited.add(nodeId);
+        recursionStack.add(nodeId);
 
-      const outgoingEdges = edges.filter((e) => e.source === nodeId);
-      for (const edge of outgoingEdges) {
-        if (!visited.has(edge.target)) {
-          if (hasCycle(edge.target)) return true;
-        } else if (recursionStack.has(edge.target)) {
-          return true;
+        const outgoingEdges = edges.filter((e) => e.source === nodeId);
+        for (const edge of outgoingEdges) {
+          if (!visited.has(edge.target)) {
+            if (hasCycle(edge.target)) return true;
+          } else if (recursionStack.has(edge.target)) {
+            return true;
+          }
         }
+
+        recursionStack.delete(nodeId);
+        return false;
+      };
+
+      if (hasCycle(startNodes[0].id)) {
+        errors.push("Flow contains an infinite loop");
       }
-
-      recursionStack.delete(nodeId);
-      return false;
-    };
-
-    if (startNodes.length > 0 && hasCycle(startNodes[0].id)) {
-      errors.push("Flow contains an infinite loop");
     }
 
     // Check condition nodes have both outputs (exception to single flow rule)
