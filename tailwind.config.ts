@@ -72,6 +72,7 @@ export default {
           fallback: "hsl(var(--node-fallback))",
           delay: "hsl(var(--node-delay))",
           handoff: "hsl(var(--node-handoff))",
+          subflow: "hsl(var(--node-subflow))",
           active: "hsl(var(--node-active))",
         },
       },

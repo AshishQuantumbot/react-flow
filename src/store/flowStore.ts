@@ -20,7 +20,8 @@ export type NodeType =
   | "ai"
   | "fallback"
   | "delay"
-  | "handoff";
+  | "handoff"
+  | "subflow";
 
 export type MeetingType = "meeting-schedule" | "site-visit" | "demo-booking";
 
@@ -139,9 +140,19 @@ const initialNodes: Node<FlowNodeData>[] = [
     data: { label: "Start" },
   },
   {
+    id: "subflow-1",
+    type: "subflow",
+    position: { x: 50, y: 150 },
+    data: { label: "Questions" },
+    style: {
+      width: 600,
+      height: 500,
+    },
+  },
+  {
     id: "end-1",
     type: "end",
-    position: { x: 250, y: 300 },
+    position: { x: 250, y: 500 },
     data: { label: "CTA", meetingType: "meeting-schedule" },
   },
 ];
@@ -160,19 +171,252 @@ const initialExecutionState: ExecutionState = {
 const generateId = () =>
   `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+// Helper function to calculate SubFlow size based on contained Question nodes
+const calculateSubFlowSize = (nodes: Node<FlowNodeData>[], subflowId: string) => {
+  const questionNodes = nodes.filter(
+    (n) => n.type === "question" && n.parentId === subflowId
+  );
+
+  if (questionNodes.length === 0) {
+    // Minimum size when no questions
+    return { width: 500, height: 400 };
+  }
+
+  // Calculate bounding box of all question nodes
+  const questionWidth = 200; // Increased from 180 to 200
+  const questionHeight = 120; // Increased from 100 to 120
+  const padding = 40; // Increased from 20 to 40
+  const headerHeight = 60; // Increased from 40 to 60
+
+  // Find the bounds of all question nodes
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+
+  questionNodes.forEach((node) => {
+    const x = node.position.x;
+    const y = node.position.y;
+    
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x + questionWidth);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y + questionHeight);
+  });
+
+  // Handle edge case where all positions are at origin
+  if (minX === Infinity) {
+    minX = 0;
+    maxX = questionWidth;
+    minY = 0;
+    maxY = questionHeight;
+  }
+
+  // Calculate required dimensions with padding
+  // Ensure we account for negative positions by using absolute bounds
+  const requiredWidth = Math.max(
+    maxX - Math.min(minX, 0) + padding * 2, 
+    padding * 2 + questionWidth
+  );
+  const requiredHeight = Math.max(
+    maxY - Math.min(minY, 0) + headerHeight + padding * 2, 
+    headerHeight + padding * 2 + questionHeight
+  );
+
+  // Ensure minimum dimensions - increased minimum sizes
+  const minWidth = 600; // Increased from 400 to 600
+  const minHeight = 500; // Increased from 300 to 500
+
+  return {
+    width: Math.max(requiredWidth, minWidth),
+    height: Math.max(requiredHeight, minHeight),
+  };
+};
+
+// Helper function to ensure all END nodes are outside SubFlow
+const ensureEndNodesOutsideSubFlow = (nodes: Node<FlowNodeData>[]): Node<FlowNodeData>[] => {
+  const subflowNode = nodes.find((n) => n.type === "subflow");
+  if (!subflowNode) return nodes;
+
+  return nodes.map((node) => {
+    // If an END node is inside SubFlow, move it outside
+    if (node.type === "end" && node.parentId === subflowNode.id) {
+      console.warn("Moving End/CTA node outside SubFlow container");
+      
+      const subflowHeight = typeof subflowNode.style?.height === 'number' 
+        ? subflowNode.style.height 
+        : 500;
+      const subflowWidth = typeof subflowNode.style?.width === 'number' 
+        ? subflowNode.style.width 
+        : 600;
+      
+      return {
+        ...node,
+        parentId: undefined,
+        extent: undefined,
+        position: {
+          x: subflowNode.position.x + subflowWidth / 2 - 90, // Center horizontally
+          y: subflowNode.position.y + subflowHeight + 50, // 50px below SubFlow
+        },
+      };
+    }
+    return node;
+  });
+};
+
+// Helper function to enforce boundary constraints
+const enforceBoundaryConstraints = (nodes: Node<FlowNodeData>[]): Node<FlowNodeData>[] => {
+  const subflowNode = nodes.find((n) => n.type === "subflow");
+  if (!subflowNode) return nodes;
+
+  return nodes.map((node) => {
+    if (node.type === "question" && node.parentId === subflowNode.id) {
+      // Question nodes: keep INSIDE SubFlow with padding
+      const subflowWidth = typeof subflowNode.style?.width === 'number' 
+        ? subflowNode.style.width 
+        : 600;
+      const subflowHeight = typeof subflowNode.style?.height === 'number' 
+        ? subflowNode.style.height 
+        : 500;
+      
+      const padding = 20;
+      const nodeWidth = 180;
+      const nodeHeight = 100;
+      const headerHeight = 40;
+      
+      const constrainedPosition = {
+        x: Math.max(padding, Math.min(node.position.x, subflowWidth - nodeWidth - padding)),
+        y: Math.max(padding + headerHeight, Math.min(node.position.y, subflowHeight - nodeHeight - padding)),
+      };
+      
+      return {
+        ...node,
+        position: constrainedPosition,
+      };
+    } else if (node.type !== "subflow" && node.type !== "question") {
+      // Other nodes: prevent from going INSIDE SubFlow
+      const subflowX = subflowNode.position.x;
+      const subflowY = subflowNode.position.y;
+      const subflowWidth = typeof subflowNode.style?.width === 'number' 
+        ? subflowNode.style.width 
+        : 600;
+      const subflowHeight = typeof subflowNode.style?.height === 'number' 
+        ? subflowNode.style.height 
+        : 500;
+      
+      const nodeX = node.position.x;
+      const nodeY = node.position.y;
+      const nodeWidth = 180;
+      const nodeHeight = 100;
+      
+      // Check if node is inside SubFlow area
+      const isInsideSubFlow = (
+        nodeX >= subflowX && 
+        nodeX + nodeWidth <= subflowX + subflowWidth &&
+        nodeY >= subflowY && 
+        nodeY + nodeHeight <= subflowY + subflowHeight
+      );
+      
+      if (isInsideSubFlow) {
+        // Push to nearest border with gap
+        const gap = 20;
+        const centerX = nodeX + nodeWidth / 2;
+        const centerY = nodeY + nodeHeight / 2;
+        const subflowCenterX = subflowX + subflowWidth / 2;
+        const subflowCenterY = subflowY + subflowHeight / 2;
+        
+        let newPosition = { ...node.position };
+        
+        // Determine which side is closest
+        if (Math.abs(centerX - subflowCenterX) > Math.abs(centerY - subflowCenterY)) {
+          // Move horizontally
+          if (centerX < subflowCenterX) {
+            newPosition.x = subflowX - nodeWidth - gap; // Left side
+          } else {
+            newPosition.x = subflowX + subflowWidth + gap; // Right side
+          }
+        } else {
+          // Move vertically
+          if (centerY < subflowCenterY) {
+            newPosition.y = subflowY - nodeHeight - gap; // Top side
+          } else {
+            newPosition.y = subflowY + subflowHeight + gap; // Bottom side
+          }
+        }
+        
+        return {
+          ...node,
+          position: newPosition,
+        };
+      }
+    }
+    
+    return node;
+  });
+};
+
+// Helper function to update SubFlow size
+const updateSubFlowSize = (nodes: Node<FlowNodeData>[]): Node<FlowNodeData>[] => {
+  return nodes.map((node) => {
+    if (node.type === "subflow") {
+      const newSize = calculateSubFlowSize(nodes, node.id);
+      const currentWidth = node.style?.width || 600; // Updated default
+      const currentHeight = node.style?.height || 500; // Updated default
+      
+      // Only update if size actually changed (avoid unnecessary re-renders)
+      if (currentWidth !== newSize.width || currentHeight !== newSize.height) {
+        return {
+          ...node,
+          style: {
+            ...node.style,
+            width: newSize.width,
+            height: newSize.height,
+          },
+        };
+      }
+    }
+    return node;
+  });
+};
+
 export const useFlowStore = create<FlowState>((set, get) => ({
-  nodes: initialNodes,
+  nodes: enforceBoundaryConstraints(ensureEndNodesOutsideSubFlow(initialNodes)),
   edges: [],
   selectedNodeId: null,
   isPanelOpen: false,
   execution: initialExecutionState,
 
-  setNodes: (nodes) => set({ nodes }),
+  setNodes: (nodes) => set({ nodes: enforceBoundaryConstraints(ensureEndNodesOutsideSubFlow(nodes)) }),
   setEdges: (edges) => set({ edges }),
 
   onNodesChange: (changes) => {
+    let updatedNodes = applyNodeChanges(changes, get().nodes) as Node<FlowNodeData>[];
+    
+    // Always ensure END nodes are outside SubFlow
+    updatedNodes = ensureEndNodesOutsideSubFlow(updatedNodes);
+    
+    // Apply boundary constraints
+    updatedNodes = enforceBoundaryConstraints(updatedNodes);
+    
+    // Check if any Question nodes were moved (position changes)
+    const hasQuestionPositionChange = changes.some(
+      (change) => 
+        change.type === 'position' && 
+        updatedNodes.find(n => n.id === change.id)?.type === 'question'
+    );
+
+    // Check if SubFlow was manually resized (dimensions change)
+    const hasSubFlowResize = changes.some(
+      (change) => 
+        change.type === 'dimensions' && 
+        updatedNodes.find(n => n.id === change.id)?.type === 'subflow'
+    );
+
+    // Only auto-resize if it's not a manual resize
+    const shouldAutoResize = hasQuestionPositionChange && !hasSubFlowResize;
+
     set({
-      nodes: applyNodeChanges(changes, get().nodes) as Node<FlowNodeData>[],
+      nodes: shouldAutoResize ? updateSubFlowSize(updatedNodes) : updatedNodes,
     });
   },
 
@@ -194,6 +438,18 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
     if (sourceNode?.type === "start" && targetNode?.type === "end") {
       console.warn("Start node cannot connect directly to End/CTA node");
+      return;
+    }
+
+    // Prevent connections to/from SubFlow nodes - they are containers only
+    if (sourceNode?.type === "subflow" || targetNode?.type === "subflow") {
+      console.warn("SubFlow nodes cannot be connected directly - they are containers for Question nodes");
+      return;
+    }
+
+    // Prevent END nodes from being dragged into SubFlow
+    if (targetNode?.type === "end" && targetNode.parentId) {
+      console.warn("End/CTA nodes cannot be placed inside SubFlow container");
       return;
     }
 
@@ -225,6 +481,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       return;
     }
 
+    if (type === "subflow" && nodes.some((n) => n.type === "subflow")) {
+      return;
+    }
+
     // Allow adding end/CTA nodes (removed the restriction)
     // The restriction was preventing End nodes without Question nodes
     // but we want End nodes to be available by default
@@ -240,11 +500,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       fallback: "Fallback",
       delay: "Delay",
       handoff: "Human Handoff",
+      subflow: "Questions",
     };
 
     // Generate unique label with numbering for duplicate types
     const getUniqueLabel = (baseLabel: string, nodeType: NodeType): string => {
-      if (nodeType === "start") return baseLabel; // Start node is always unique
+      if (nodeType === "start" || nodeType === "subflow") return baseLabel; // Start and SubFlow nodes are always unique
 
       const existingNodes = nodes.filter((n) => n.type === nodeType);
       if (existingNodes.length === 0) {
@@ -286,11 +547,66 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       };
     }
 
+    // Handle Question node placement inside SubFlow
+    let finalPosition = position;
+    let parentNode = undefined;
+    let extent = undefined;
+
+    if (type === "question") {
+      const subflowNode = nodes.find((n) => n.type === "subflow");
+      if (subflowNode) {
+        // Place question inside the subflow
+        parentNode = subflowNode.id;
+        extent = "parent" as const;
+        
+        // Calculate position relative to subflow (with padding)
+        const existingQuestions = nodes.filter(
+          (n) => n.type === "question" && n.parentId === subflowNode.id
+        );
+        
+        // Position questions in a grid inside the subflow
+        const questionsPerRow = 2;
+        const questionIndex = existingQuestions.length;
+        const row = Math.floor(questionIndex / questionsPerRow);
+        const col = questionIndex % questionsPerRow;
+        
+        finalPosition = {
+          x: 40 + col * 200, // Increased padding to 40px and spacing to 200px
+          y: 60 + row * 120,  // Increased header space to 60px and row height to 120px
+        };
+      } else {
+        console.warn("Cannot add Question node: SubFlow container not found");
+        return;
+      }
+    }
+
+    // Ensure END nodes are placed outside SubFlow
+    if (type === "end") {
+      const subflowNode = nodes.find((n) => n.type === "subflow");
+      if (subflowNode) {
+        // Position END node below the SubFlow container
+        const subflowHeight = typeof subflowNode.style?.height === 'number' 
+          ? subflowNode.style.height 
+          : 500;
+        const subflowWidth = typeof subflowNode.style?.width === 'number' 
+          ? subflowNode.style.width 
+          : 600;
+        const subflowBottom = subflowNode.position.y + subflowHeight;
+        
+        finalPosition = {
+          x: subflowNode.position.x + subflowWidth / 2 - 90, // Center horizontally
+          y: subflowBottom + 50, // 50px gap below SubFlow
+        };
+      }
+    }
+
     const newNode: Node<FlowNodeData> = {
       id: generateId(),
       type,
-      position,
+      position: finalPosition,
       data: defaultData,
+      ...(parentNode && { parentId: parentNode }),
+      ...(extent && { extent }),
     };
 
     // Auto-connect logic for multiple connections
@@ -299,8 +615,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     // Find nodes that can connect to the new node
     const availableNodes = nodes.filter((n) => n.type !== "end");
 
-    if (availableNodes.length > 0 && type !== "start") {
-      // Don't auto-connect Start nodes, but auto-connect others
+    if (availableNodes.length > 0 && type !== "start" && type !== "subflow") {
+      // Don't auto-connect Start nodes or SubFlow nodes, but auto-connect others
 
       if (type === "end") {
         // For End nodes, connect to the most recently added Question node
@@ -349,7 +665,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       : edges;
 
     set({
-      nodes: [...nodes, newNode],
+      nodes: enforceBoundaryConstraints(ensureEndNodesOutsideSubFlow(updateSubFlowSize([...nodes, newNode]))),
       edges: newEdges,
       selectedNodeId: newNode.id,
       isPanelOpen: true,
@@ -416,8 +732,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     // If deleting a question node, we no longer automatically delete end nodes
     // End nodes can exist independently now
 
+    const updatedNodes = nodes.filter((n) => !nodesToDelete.includes(n.id));
+
     set({
-      nodes: nodes.filter((n) => !nodesToDelete.includes(n.id)),
+      nodes: enforceBoundaryConstraints(ensureEndNodesOutsideSubFlow(updateSubFlowSize(updatedNodes))),
       edges: newEdges,
       selectedNodeId: null,
       isPanelOpen: false,
@@ -444,7 +762,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     try {
       const { nodes, edges } = JSON.parse(json);
       if (Array.isArray(nodes) && Array.isArray(edges)) {
-        set({ nodes, edges, selectedNodeId: null, isPanelOpen: false });
+        set({ 
+          nodes: enforceBoundaryConstraints(ensureEndNodesOutsideSubFlow(updateSubFlowSize(nodes))), 
+          edges, 
+          selectedNodeId: null, 
+          isPanelOpen: false 
+        });
         return true;
       }
       return false;
@@ -465,6 +788,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       errors.push("Flow can only have one Start node");
     }
 
+    // Check for subflow node
+    const subflowNodes = nodes.filter((n) => n.type === "subflow");
+    if (subflowNodes.length === 0) {
+      errors.push("Flow must have a SubFlow container");
+    } else if (subflowNodes.length > 1) {
+      errors.push("Flow can only have one SubFlow container");
+    }
+
     // Check for end node
     const endNodes = nodes.filter((n) => n.type === "end");
     if (endNodes.length === 0) {
@@ -478,6 +809,40 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         "Please add at least one Question node to create a valid flow",
       );
     }
+
+    // NEW: Validate SubFlow constraints
+    if (subflowNodes.length > 0 && questionNodes.length > 0) {
+      const subflowId = subflowNodes[0].id;
+      
+      // Check that ALL Question nodes are inside the SubFlow
+      questionNodes.forEach((node) => {
+        if (node.parentId !== subflowId) {
+          errors.push(
+            `Question node "${node.data.label}" must be inside the SubFlow container`,
+          );
+        }
+      });
+    }
+
+    // Check that no non-Question nodes are inside SubFlow
+    const nodesInSubflow = nodes.filter((n) => n.parentId && subflowNodes.some(sf => sf.id === n.parentId));
+    nodesInSubflow.forEach((node) => {
+      if (node.type !== "question") {
+        errors.push(
+          `Only Question nodes are allowed inside the SubFlow container. Found: ${node.data.label} (${node.type})`,
+        );
+      }
+    });
+
+    // Check that END/CTA nodes are NOT inside SubFlow
+    const endNodesInSubflow = nodes.filter((n) => n.type === "end");
+    endNodesInSubflow.forEach((node) => {
+      if (node.parentId && subflowNodes.some(sf => sf.id === node.parentId)) {
+        errors.push(
+          `End/CTA node "${node.data.label}" must be outside the SubFlow container`,
+        );
+      }
+    });
 
     // Allow multiple connections (removed single linear flow restriction)
     // Only condition nodes still need special handling for TRUE/FALSE paths
