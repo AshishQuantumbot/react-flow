@@ -1,7 +1,7 @@
 import { memo, ReactNode } from "react";
 import { Handle, Position, NodeProps, Node } from "@xyflow/react";
 import { cn } from "@/lib/utils";
-import { FlowNodeData } from "@/store/flowStore";
+import {FlowNodeData } from "@/store/flowStore";
 
 type FlowNode = Node<FlowNodeData>;
 
@@ -80,6 +80,15 @@ export const BaseNode = memo(function BaseNode({
               Weight:{" "}
             </span>
             {data.weight}
+          </div>
+        )}
+
+          {data.priority && (
+          <div className="text-xs text-muted-foreground mb-1">
+            <span className="font-medium text-sm text-foreground">
+              Priority:{" "}
+            </span>
+            {data.priority}
           </div>
         )}
 

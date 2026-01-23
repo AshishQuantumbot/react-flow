@@ -1,19 +1,9 @@
 import { useEffect, useState } from "react";
-import {
-  X,
-  Trash2,
-  Sparkles,
-  Globe,
-  Timer,
-  ShieldAlert,
-  UserCheck,
-  GitBranch,
-} from "lucide-react";
+import { X, Trash2, Sparkles, Globe } from "lucide-react";
 import { useFlowStore, FlowNodeData } from "@/store/flowStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -21,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 const meetingTypes = [
@@ -61,15 +50,15 @@ export function NodeEditorPanel() {
       // Check if deleting this question node would also delete end nodes
       if (selectedNode.type === "question") {
         const remainingQuestionNodes = nodes.filter(
-          (n) => n.type === "question" && n.id !== selectedNodeId
+          (n) => n.type === "question" && n.id !== selectedNodeId,
         );
         const endNodes = nodes.filter((n) => n.type === "end");
-        
+
         if (remainingQuestionNodes.length === 0 && endNodes.length > 0) {
           // Show confirmation or just proceed - the store will handle the cascading delete
         }
       }
-      
+
       deleteNode(selectedNodeId);
     }
   };
@@ -86,23 +75,12 @@ export function NodeEditorPanel() {
   const nodeTypeLabels: Record<string, string> = {
     start: "Start Node",
     question: "Question Node",
-    answer: "Answer Node",
-    condition: "Condition Node",
-    api: "API Node",
     end: "CTA Node",
-    ai: "AI Prompt Node",
-    fallback: "Fallback Node",
-    delay: "Delay Node",
-    handoff: "Human Handoff Node",
   };
 
   const nodeTypeIcons: Record<string, React.ReactNode> = {
     ai: <Sparkles className="w-4 h-4 text-node-ai" />,
     api: <Globe className="w-4 h-4 text-node-api" />,
-    delay: <Timer className="w-4 h-4 text-node-delay" />,
-    fallback: <ShieldAlert className="w-4 h-4 text-node-fallback" />,
-    handoff: <UserCheck className="w-4 h-4 text-node-handoff" />,
-    condition: <GitBranch className="w-4 h-4 text-node-condition" />,
   };
 
   return (
@@ -143,23 +121,64 @@ export function NodeEditorPanel() {
           </div>
         )}
 
-        {/* Channel Selection (for applicable nodes) */}
-        {["question", "answer", "ai"].includes(selectedNode.type || "") && (
-          <div className="space-y-2">
-            <Label htmlFor="required">Required</Label>
-            <Select
-              value={formData.required || "yes"}
-              onValueChange={(value) => updateField("required", value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="yes">YES</SelectItem>
-                <SelectItem value="no">No</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        {/* Weight/Score field for all nodes */}
+        {selectedNode.type === "question" && (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="required">Required</Label>
+              <Select
+                value={formData.required || "yes"}
+                onValueChange={(value) => updateField("required", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">YES</SelectItem>
+                  <SelectItem value="no">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="weight">Weight/Score</Label>
+              <Input
+                id="weight"
+                value={formData.weight ?? ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === "" || /^-?\d+$/.test(value)) {
+                    updateField(
+                      "weight",
+                      value === "" ? undefined : parseInt(value),
+                    );
+                  }
+                }}
+                placeholder="Enter integer value"
+                min={Number.MIN_SAFE_INTEGER}
+                max={Number.MAX_SAFE_INTEGER}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="priority">Priority</Label>
+              <Input
+                id="priority"
+                value={formData.priority ?? ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === "" || /^-?\d+$/.test(value)) {
+                    updateField(
+                      "priority",
+                      value === "" ? undefined : parseInt(value),
+                    );
+                  }
+                }}
+                placeholder="Enter integer value"
+                min={Number.MIN_SAFE_INTEGER}
+                max={Number.MAX_SAFE_INTEGER}
+              />
+            
+            </div>
+          </>
         )}
 
         {/* Meeting Type field for all nodes */}
@@ -207,408 +226,6 @@ export function NodeEditorPanel() {
               />
             </div>
           </>
-        )}
-
-        {/* Weight/Score field for all nodes */}
-        {selectedNode.type === "question" && (
-          <div className="space-y-2">
-            <Label htmlFor="weight">Weight/Score</Label>
-            <Input
-              id="weight"
-              type="number"
-              value={formData.weight ?? ""}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === "" || /^-?\d+$/.test(value)) {
-                  updateField(
-                    "weight",
-                    value === "" ? undefined : parseInt(value),
-                  );
-                }
-              }}
-              placeholder="Enter integer value"
-              min={Number.MIN_SAFE_INTEGER}
-              max={Number.MAX_SAFE_INTEGER}
-            />
-          </div>
-        )}
-
-        {/* Question Node Fields */}
-        {/* {selectedNode.type === 'question' && (
-          <div className="space-y-2">
-            <Label htmlFor="question">User Question / Intent</Label>
-            <Textarea
-              id="question"
-              value={formData.question || ''}
-              onChange={(e) => updateField('question', e.target.value)}
-              placeholder="What the user might ask..."
-              rows={3}
-            />
-          </div>
-        )} */}
-
-        {/* Answer Node Fields */}
-        {selectedNode.type === "answer" && (
-          <Tabs defaultValue="static" className="w-full">
-            <TabsList className="w-full">
-              <TabsTrigger value="static" className="flex-1">
-                Static
-              </TabsTrigger>
-              <TabsTrigger value="ai" className="flex-1">
-                <Sparkles className="w-3 h-3 mr-1" /> AI
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="static" className="space-y-2 mt-4">
-              <Label htmlFor="answer">Bot Response</Label>
-              <Textarea
-                id="answer"
-                value={formData.answer || ""}
-                onChange={(e) => updateField("answer", e.target.value)}
-                placeholder="Type the bot's response..."
-                rows={4}
-              />
-            </TabsContent>
-            <TabsContent value="ai" className="space-y-2 mt-4">
-              <Label htmlFor="aiPrompt">AI Prompt</Label>
-              <Textarea
-                id="aiPrompt"
-                value={formData.aiPrompt || ""}
-                onChange={(e) => updateField("aiPrompt", e.target.value)}
-                placeholder="Describe how AI should respond..."
-                rows={4}
-              />
-            </TabsContent>
-          </Tabs>
-        )}
-
-        {/* AI Prompt Node Fields */}
-        {selectedNode.type === "ai" && (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="systemPrompt">System Prompt</Label>
-              <Textarea
-                id="systemPrompt"
-                value={formData.systemPrompt || ""}
-                onChange={(e) => updateField("systemPrompt", e.target.value)}
-                placeholder="You are a helpful assistant..."
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="aiPrompt">User Prompt Template</Label>
-              <Textarea
-                id="aiPrompt"
-                value={formData.aiPrompt || ""}
-                onChange={(e) => updateField("aiPrompt", e.target.value)}
-                placeholder="Use {{variable}} for context injection..."
-                rows={4}
-              />
-              <p className="text-xs text-muted-foreground">
-                Use {"{{variableName}}"} to inject context variables
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Condition Node Fields */}
-        {selectedNode.type === "condition" && (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="variable">Variable to Check</Label>
-              <Input
-                id="variable"
-                value={formData.conditions?.variable || ""}
-                onChange={(e) =>
-                  updateField("conditions", {
-                    ...formData.conditions,
-                    variable: e.target.value,
-                  })
-                }
-                placeholder="e.g., user_input, intent, confidence"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="operator">Operator</Label>
-              <Select
-                value={formData.conditions?.operator || "equals"}
-                onValueChange={(value) =>
-                  updateField("conditions", {
-                    ...formData.conditions,
-                    operator: value,
-                  })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="equals">Equals</SelectItem>
-                  <SelectItem value="contains">Contains</SelectItem>
-                  <SelectItem value="greater">Greater than</SelectItem>
-                  <SelectItem value="less">Less than</SelectItem>
-                  <SelectItem value="exists">Exists</SelectItem>
-                  <SelectItem value="intent">Intent Match</SelectItem>
-                  <SelectItem value="confidence">Confidence ≥</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="value">Value</Label>
-              <Input
-                id="value"
-                value={formData.conditions?.value || ""}
-                onChange={(e) =>
-                  updateField("conditions", {
-                    ...formData.conditions,
-                    value: e.target.value,
-                  })
-                }
-                placeholder="Value to compare"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* API Node Fields */}
-        {selectedNode.type === "api" && (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="method">HTTP Method</Label>
-              <Select
-                value={formData.apiConfig?.method || "GET"}
-                onValueChange={(value) =>
-                  updateField("apiConfig", {
-                    ...formData.apiConfig,
-                    method: value,
-                  })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="GET">GET</SelectItem>
-                  <SelectItem value="POST">POST</SelectItem>
-                  <SelectItem value="PUT">PUT</SelectItem>
-                  <SelectItem value="DELETE">DELETE</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="url">API URL</Label>
-              <Input
-                id="url"
-                value={formData.apiConfig?.url || ""}
-                onChange={(e) =>
-                  updateField("apiConfig", {
-                    ...formData.apiConfig,
-                    url: e.target.value,
-                  })
-                }
-                placeholder="https://api.example.com/endpoint"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="body">Request Body (JSON)</Label>
-              <Textarea
-                id="body"
-                value={formData.apiConfig?.body || ""}
-                onChange={(e) =>
-                  updateField("apiConfig", {
-                    ...formData.apiConfig,
-                    body: e.target.value,
-                  })
-                }
-                placeholder='{"key": "value"}'
-                rows={3}
-                className="font-mono text-xs"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-2">
-                <Label htmlFor="retryCount">Retry Count</Label>
-                <Input
-                  id="retryCount"
-                  type="number"
-                  min={0}
-                  max={5}
-                  value={formData.apiConfig?.retryCount || 0}
-                  onChange={(e) =>
-                    updateField("apiConfig", {
-                      ...formData.apiConfig,
-                      retryCount: parseInt(e.target.value) || 0,
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="retryDelay">Retry Delay (ms)</Label>
-                <Input
-                  id="retryDelay"
-                  type="number"
-                  min={0}
-                  value={formData.apiConfig?.retryDelay || 1000}
-                  onChange={(e) =>
-                    updateField("apiConfig", {
-                      ...formData.apiConfig,
-                      retryDelay: parseInt(e.target.value) || 1000,
-                    })
-                  }
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="responseMapping">Response Mapping</Label>
-              <Input
-                id="responseMapping"
-                value={formData.apiConfig?.responseMapping || ""}
-                onChange={(e) =>
-                  updateField("apiConfig", {
-                    ...formData.apiConfig,
-                    responseMapping: e.target.value,
-                  })
-                }
-                placeholder="data.result.message"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Delay Node Fields */}
-        {selectedNode.type === "delay" && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-2">
-                <Label htmlFor="duration">Duration</Label>
-                <Input
-                  id="duration"
-                  type="number"
-                  min={1}
-                  value={formData.delayConfig?.duration || 5}
-                  onChange={(e) =>
-                    updateField("delayConfig", {
-                      ...formData.delayConfig,
-                      duration: parseInt(e.target.value) || 5,
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="unit">Unit</Label>
-                <Select
-                  value={formData.delayConfig?.unit || "seconds"}
-                  onValueChange={(value) =>
-                    updateField("delayConfig", {
-                      ...formData.delayConfig,
-                      unit: value,
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="seconds">Seconds</SelectItem>
-                    <SelectItem value="minutes">Minutes</SelectItem>
-                    <SelectItem value="hours">Hours</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Fallback Node Fields */}
-        {selectedNode.type === "fallback" && (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="fallbackMessage">Fallback Message</Label>
-              <Textarea
-                id="fallbackMessage"
-                value={formData.fallbackConfig?.fallbackMessage || ""}
-                onChange={(e) =>
-                  updateField("fallbackConfig", {
-                    ...formData.fallbackConfig,
-                    fallbackMessage: e.target.value,
-                  })
-                }
-                placeholder="Sorry, I didn't understand that..."
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="maxRetries">Max Retries</Label>
-              <Input
-                id="maxRetries"
-                type="number"
-                min={1}
-                max={10}
-                value={formData.fallbackConfig?.maxRetries || 3}
-                onChange={(e) =>
-                  updateField("fallbackConfig", {
-                    ...formData.fallbackConfig,
-                    maxRetries: parseInt(e.target.value) || 3,
-                  })
-                }
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Handoff Node Fields */}
-        {selectedNode.type === "handoff" && (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="department">Department</Label>
-              <Input
-                id="department"
-                value={formData.handoffConfig?.department || ""}
-                onChange={(e) =>
-                  updateField("handoffConfig", {
-                    ...formData.handoffConfig,
-                    department: e.target.value,
-                  })
-                }
-                placeholder="Sales, Support, Billing..."
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="priority">Priority</Label>
-              <Select
-                value={formData.handoffConfig?.priority || "medium"}
-                onValueChange={(value) =>
-                  updateField("handoffConfig", {
-                    ...formData.handoffConfig,
-                    priority: value as "low" | "medium" | "high",
-                  })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="handoffMessage">Handoff Message</Label>
-              <Textarea
-                id="handoffMessage"
-                value={formData.handoffConfig?.message || ""}
-                onChange={(e) =>
-                  updateField("handoffConfig", {
-                    ...formData.handoffConfig,
-                    message: e.target.value,
-                  })
-                }
-                placeholder="Please wait while we connect you..."
-                rows={2}
-              />
-            </div>
-          </div>
         )}
       </div>
 

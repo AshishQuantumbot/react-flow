@@ -75,6 +75,7 @@ export interface FlowNodeData {
   };
   channel?: "all" | "web" | "whatsapp" | "telegram" | "facebook";
   required?: string;
+  priority?: number;
   [key: string]: unknown;
 }
 
@@ -183,14 +184,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   onConnect: (connection) => {
     const { nodes, edges } = get();
-    
+
     // Allow multiple outgoing connections (removed single flow restriction)
     // Now Start can connect to multiple Questions, Questions can connect to Questions, etc.
 
     // Still prevent Start node from connecting directly to End node
-    const sourceNode = nodes.find(n => n.id === connection.source);
-    const targetNode = nodes.find(n => n.id === connection.target);
-    
+    const sourceNode = nodes.find((n) => n.id === connection.source);
+    const targetNode = nodes.find((n) => n.id === connection.target);
+
     if (sourceNode?.type === "start" && targetNode?.type === "end") {
       console.warn("Start node cannot connect directly to End/CTA node");
       return;
@@ -198,7 +199,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
     // Prevent duplicate connections
     const connectionExists = edges.some(
-      e => e.source === connection.source && e.target === connection.target
+      (e) => e.source === connection.source && e.target === connection.target,
     );
     if (connectionExists) {
       console.warn("Connection already exists");
@@ -244,22 +245,24 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     // Generate unique label with numbering for duplicate types
     const getUniqueLabel = (baseLabel: string, nodeType: NodeType): string => {
       if (nodeType === "start") return baseLabel; // Start node is always unique
-      
-      const existingNodes = nodes.filter(n => n.type === nodeType);
+
+      const existingNodes = nodes.filter((n) => n.type === nodeType);
       if (existingNodes.length === 0) {
         return baseLabel; // First node of this type
       }
-      
+
       // Find the highest number used
       let maxNumber = 0;
-      existingNodes.forEach(node => {
-        const match = node.data.label.match(new RegExp(`^${baseLabel}\\s*(\\d+)?$`));
+      existingNodes.forEach((node) => {
+        const match = node.data.label.match(
+          new RegExp(`^${baseLabel}\\s*(\\d+)?$`),
+        );
         if (match) {
           const num = match[1] ? parseInt(match[1]) : 1;
           maxNumber = Math.max(maxNumber, num);
         }
       });
-      
+
       // For the first duplicate, use "Question 2", "Answer 2", etc.
       const nextNumber = maxNumber === 0 ? 2 : maxNumber + 1;
       return `${baseLabel} ${nextNumber}`;
@@ -270,7 +273,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
     // Set default data based on node type
     let defaultData: FlowNodeData = { label: uniqueLabel };
-    
+
     if (type === "question") {
       defaultData = {
         ...defaultData,
@@ -294,27 +297,33 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     let sourceNodeId: string | null = null;
 
     // Find nodes that can connect to the new node
-    const availableNodes = nodes.filter(n => n.type !== "end");
+    const availableNodes = nodes.filter((n) => n.type !== "end");
 
     if (availableNodes.length > 0 && type !== "start") {
       // Don't auto-connect Start nodes, but auto-connect others
-      
+
       if (type === "end") {
         // For End nodes, connect to the most recently added Question node
-        const questionNodes = availableNodes.filter(n => n.type === "question");
+        const questionNodes = availableNodes.filter(
+          (n) => n.type === "question",
+        );
         if (questionNodes.length > 0) {
           sourceNodeId = questionNodes[questionNodes.length - 1].id;
         }
       } else {
         // For Question nodes, connect to Start if it has no connections, otherwise to the last Question
-        const startNode = availableNodes.find(n => n.type === "start");
-        const startHasConnections = edges.some(e => e.source === startNode?.id);
-        
+        const startNode = availableNodes.find((n) => n.type === "start");
+        const startHasConnections = edges.some(
+          (e) => e.source === startNode?.id,
+        );
+
         if (startNode && !startHasConnections) {
           sourceNodeId = startNode.id;
         } else {
           // Connect to the most recently added Question node
-          const questionNodes = availableNodes.filter(n => n.type === "question");
+          const questionNodes = availableNodes.filter(
+            (n) => n.type === "question",
+          );
           if (questionNodes.length > 0) {
             sourceNodeId = questionNodes[questionNodes.length - 1].id;
           } else if (startNode) {
@@ -326,22 +335,24 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
 
     // Create the new edge if we found a source
-    const newEdges = sourceNodeId ? [
-      ...edges,
-      {
-        id: `edge-${sourceNodeId}-${newNode.id}`,
-        source: sourceNodeId,
-        target: newNode.id,
-        animated: true,
-        style: { strokeWidth: 2 },
-      }
-    ] : edges;
+    const newEdges = sourceNodeId
+      ? [
+          ...edges,
+          {
+            id: `edge-${sourceNodeId}-${newNode.id}`,
+            source: sourceNodeId,
+            target: newNode.id,
+            animated: true,
+            style: { strokeWidth: 2 },
+          },
+        ]
+      : edges;
 
-    set({ 
+    set({
       nodes: [...nodes, newNode],
       edges: newEdges,
       selectedNodeId: newNode.id,
-      isPanelOpen: true
+      isPanelOpen: true,
     });
   },
 
@@ -358,17 +369,21 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   deleteNode: (nodeId) => {
     const { nodes, edges } = get();
     const nodeToDelete = nodes.find((n) => n.id === nodeId);
-    
+
     if (!nodeToDelete) return;
 
     let nodesToDelete = [nodeId];
-    let edgesToDelete = edges.filter((e) => e.source === nodeId || e.target === nodeId);
+    let edgesToDelete = edges.filter(
+      (e) => e.source === nodeId || e.target === nodeId,
+    );
 
     // Smart reconnection logic for multiple connections
     const incomingEdges = edges.filter((e) => e.target === nodeId);
     const outgoingEdges = edges.filter((e) => e.source === nodeId);
-    
-    let newEdges = edges.filter((e) => !edgesToDelete.some((del) => del.id === e.id));
+
+    let newEdges = edges.filter(
+      (e) => !edgesToDelete.some((del) => del.id === e.id),
+    );
 
     // If the deleted node was in the middle of connections, reconnect appropriately
     if (incomingEdges.length > 0 && outgoingEdges.length > 0) {
@@ -385,12 +400,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             ...(inEdge.sourceHandle && { sourceHandle: inEdge.sourceHandle }),
             ...(outEdge.targetHandle && { targetHandle: outEdge.targetHandle }),
           };
-          
+
           // Only add if this connection doesn't already exist
           const connectionExists = newEdges.some(
-            (e) => e.source === newEdge.source && e.target === newEdge.target
+            (e) => e.source === newEdge.source && e.target === newEdge.target,
           );
-          
+
           if (!connectionExists) {
             newEdges.push(newEdge);
           }
@@ -457,9 +472,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
 
     // REQUIRE at least one Question node for submission
-    const questionNodes = nodes.filter(n => n.type === "question");
+    const questionNodes = nodes.filter((n) => n.type === "question");
     if (questionNodes.length === 0) {
-      errors.push("Please add at least one Question node to create a valid flow");
+      errors.push(
+        "Please add at least one Question node to create a valid flow",
+      );
     }
 
     // Allow multiple connections (removed single linear flow restriction)
@@ -468,10 +485,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     // Check Start node doesn't connect directly to End
     if (startNodes.length > 0 && endNodes.length > 0) {
       const startToEndConnection = edges.some(
-        (e) => e.source === startNodes[0].id && endNodes.some(end => end.id === e.target)
+        (e) =>
+          e.source === startNodes[0].id &&
+          endNodes.some((end) => end.id === e.target),
       );
       if (startToEndConnection) {
-        errors.push("Start node cannot connect directly to End/CTA node. Add at least one Question node between them.");
+        errors.push(
+          "Start node cannot connect directly to End/CTA node. Add at least one Question node between them.",
+        );
       }
     }
 
@@ -490,24 +511,28 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           errors.push(`Question node "${node.data.label}" is not connected`);
         }
       });
-      
+
       // Check if Start connects to at least one Question
       if (startNodes.length > 0) {
         const startHasConnection = edges.some(
           (e) => e.source === startNodes[0].id,
         );
         if (!startHasConnection) {
-          errors.push("Please connect the Start node to at least one Question node");
+          errors.push(
+            "Please connect the Start node to at least one Question node",
+          );
         }
       }
 
       // Check if at least one Question connects to End/CTA
       if (endNodes.length > 0) {
-        const endHasIncomingConnection = edges.some(
-          (e) => endNodes.some(end => end.id === e.target)
+        const endHasIncomingConnection = edges.some((e) =>
+          endNodes.some((end) => end.id === e.target),
         );
         if (!endHasIncomingConnection) {
-          errors.push("Please connect at least one Question node to the End/CTA node");
+          errors.push(
+            "Please connect at least one Question node to the End/CTA node",
+          );
         }
       }
 
@@ -515,16 +540,16 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       // This prevents scenarios where Questions are connected but not part of valid flow
       if (startNodes.length > 0 && endNodes.length > 0) {
         const startNodeId = startNodes[0].id;
-        const endNodeIds = endNodes.map(n => n.id);
+        const endNodeIds = endNodes.map((n) => n.id);
 
         // Find all nodes reachable from Start (forward traversal)
         const reachableFromStart = new Set<string>();
         const findReachableFromStart = (nodeId: string) => {
           if (reachableFromStart.has(nodeId)) return;
           reachableFromStart.add(nodeId);
-          
-          const outgoingEdges = edges.filter(e => e.source === nodeId);
-          outgoingEdges.forEach(edge => {
+
+          const outgoingEdges = edges.filter((e) => e.source === nodeId);
+          outgoingEdges.forEach((edge) => {
             findReachableFromStart(edge.target);
           });
         };
@@ -535,25 +560,29 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         const findCanReachEnd = (nodeId: string) => {
           if (canReachEnd.has(nodeId)) return;
           canReachEnd.add(nodeId);
-          
-          const incomingEdges = edges.filter(e => e.target === nodeId);
-          incomingEdges.forEach(edge => {
+
+          const incomingEdges = edges.filter((e) => e.target === nodeId);
+          incomingEdges.forEach((edge) => {
             findCanReachEnd(edge.source);
           });
         };
-        endNodeIds.forEach(endId => findCanReachEnd(endId));
+        endNodeIds.forEach((endId) => findCanReachEnd(endId));
 
         // Validate each Question is in a complete Start→End path
         questionNodes.forEach((node) => {
           const isReachableFromStart = reachableFromStart.has(node.id);
           const canReachEndCTA = canReachEnd.has(node.id);
-          
+
           if (!isReachableFromStart) {
-            errors.push(`Question node "${node.data.label}" is not reachable from Start node`);
+            errors.push(
+              `Question node "${node.data.label}" is not reachable from Start node`,
+            );
           }
-          
+
           if (!canReachEndCTA) {
-            errors.push(`Question node "${node.data.label}" does not lead to End/CTA node`);
+            errors.push(
+              `Question node "${node.data.label}" does not lead to End/CTA node`,
+            );
           }
         });
       }
