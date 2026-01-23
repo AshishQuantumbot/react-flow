@@ -21,6 +21,7 @@ import { AIPromptNode } from './nodes/AIPromptNode';
 import { FallbackNode } from './nodes/FallbackNode';
 import { DelayNode } from './nodes/DelayNode';
 import { HandoffNode } from './nodes/HandoffNode';
+import { SubFlowNode } from './nodes/SubFlowNode';
 import { NodeToolbar } from './NodeToolbar';
 import { NodeEditorPanel } from './NodeEditorPanel';
 import { FlowHeader } from './FlowHeader';
@@ -38,6 +39,7 @@ const nodeTypes: NodeTypes = {
   fallback: FallbackNode,
   delay: DelayNode,
   handoff: HandoffNode,
+  subflow: SubFlowNode,
 };
 
 export function FlowCanvas() {
@@ -86,13 +88,15 @@ export function FlowCanvas() {
     selectNode(null);
   }, [selectNode]);
 
-  // Enhance nodes with execution state styling
+  // Enhance nodes with execution state styling and z-index layering
   const enhancedNodes = nodes.map(node => ({
     ...node,
     className: cn(
       execution.currentNodeId === node.id && 'node-active-glow',
       execution.executionHistory.includes(node.id) && execution.currentNodeId !== node.id && 'opacity-60'
     ),
+    // Set z-index based on node type for proper layering
+    zIndex: node.type === 'subflow' ? -1 : node.type === 'question' ? 10 : 1,
   }));
 
   return (

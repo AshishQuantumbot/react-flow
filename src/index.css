@@ -48,6 +48,7 @@
     --node-fallback: 25 95% 50%;
     --node-delay: 200 70% 50%;
     --node-handoff: 330 80% 55%;
+    --node-subflow: 260 60% 50%;
     --node-active: 142 71% 50%;
 
     /* Shadows - softer for light mode */
@@ -109,6 +110,7 @@
     --node-fallback: 25 95% 55%;
     --node-delay: 200 70% 55%;
     --node-handoff: 330 80% 60%;
+    --node-subflow: 260 60% 55%;
     --node-active: 142 71% 55%;
 
     /* Shadows - glowing for dark mode */
@@ -213,6 +215,23 @@
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
+}
+
+/* Node layering for proper visual hierarchy */
+.react-flow__node[data-type="subflow"] {
+  z-index: -1 !important;
+}
+
+.react-flow__node[data-type="question"] {
+  z-index: 10 !important;
+}
+
+.react-flow__node[data-type="end"] {
+  z-index: 1 !important;
+}
+
+.react-flow__node[data-type="start"] {
+  z-index: 5 !important;
 }
 
 .react-flow__controls-button {

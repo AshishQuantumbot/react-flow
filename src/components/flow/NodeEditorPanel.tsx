@@ -76,6 +76,7 @@ export function NodeEditorPanel() {
     start: "Start Node",
     question: "Question Node",
     end: "CTA Node",
+    subflow: "SubFlow Container",
   };
 
   const nodeTypeIcons: Record<string, React.ReactNode> = {
