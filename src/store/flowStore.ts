@@ -610,7 +610,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     };
 
     // Auto-connect logic for multiple connections
-    let sourceNodeId: string | null = null;
+    let newEdges = [...edges];
 
     // Find nodes that can connect to the new node
     const availableNodes = nodes.filter((n) => n.type !== "end");
@@ -618,51 +618,53 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     if (availableNodes.length > 0 && type !== "start" && type !== "subflow") {
       // Don't auto-connect Start nodes or SubFlow nodes, but auto-connect others
 
-      if (type === "end") {
-        // For End nodes, connect to the most recently added Question node
-        const questionNodes = availableNodes.filter(
-          (n) => n.type === "question",
-        );
-        if (questionNodes.length > 0) {
-          sourceNodeId = questionNodes[questionNodes.length - 1].id;
-        }
-      } else {
-        // For Question nodes, connect to Start if it has no connections, otherwise to the last Question
+      if (type === "question") {
+        // For Question nodes: ALWAYS connect to Start node
         const startNode = availableNodes.find((n) => n.type === "start");
-        const startHasConnections = edges.some(
-          (e) => e.source === startNode?.id,
-        );
-
-        if (startNode && !startHasConnections) {
-          sourceNodeId = startNode.id;
-        } else {
-          // Connect to the most recently added Question node
-          const questionNodes = availableNodes.filter(
-            (n) => n.type === "question",
-          );
-          if (questionNodes.length > 0) {
-            sourceNodeId = questionNodes[questionNodes.length - 1].id;
-          } else if (startNode) {
-            // If no Questions exist, connect to Start (allowing multiple connections from Start)
-            sourceNodeId = startNode.id;
-          }
-        }
-      }
-    }
-
-    // Create the new edge if we found a source
-    const newEdges = sourceNodeId
-      ? [
-          ...edges,
-          {
-            id: `edge-${sourceNodeId}-${newNode.id}`,
-            source: sourceNodeId,
+        if (startNode) {
+          // Connect Start → Question
+          newEdges.push({
+            id: `edge-${startNode.id}-${newNode.id}`,
+            source: startNode.id,
             target: newNode.id,
             animated: true,
             style: { strokeWidth: 2 },
-          },
-        ]
-      : edges;
+          });
+
+          // Also connect Question → End (if End node exists)
+          const endNode = nodes.find((n) => n.type === "end");
+          if (endNode) {
+            newEdges.push({
+              id: `edge-${newNode.id}-${endNode.id}`,
+              source: newNode.id,
+              target: endNode.id,
+              animated: true,
+              style: { strokeWidth: 2 },
+            });
+          }
+        }
+      } else if (type === "end") {
+        // For End nodes, connect to all existing Question nodes
+        const questionNodes = availableNodes.filter(
+          (n) => n.type === "question",
+        );
+        questionNodes.forEach((questionNode) => {
+          // Check if connection already exists
+          const connectionExists = newEdges.some(
+            (e) => e.source === questionNode.id && e.target === newNode.id,
+          );
+          if (!connectionExists) {
+            newEdges.push({
+              id: `edge-${questionNode.id}-${newNode.id}`,
+              source: questionNode.id,
+              target: newNode.id,
+              animated: true,
+              style: { strokeWidth: 2 },
+            });
+          }
+        });
+      }
+    }
 
     set({
       nodes: enforceBoundaryConstraints(ensureEndNodesOutsideSubFlow(updateSubFlowSize([...nodes, newNode]))),
